@@ -1,0 +1,141 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\geometry{margin=1in}
+\setstretch{1.2}
+
+\begin{document}
+
+\subsection*{Carr and Wu (2003): What Type of Process Underlies Options? A Simple Robust Test}
+
+\subsubsection*{Introduction}
+
+A fundamental question in asset pricing is whether stock prices are best described
+by a purely continuous process (PC), a pure jump process (PJ), or a combination
+of both (CJ). The direct approach --- examining time-series data --- is unreliable
+unless the sampling frequency is extremely high, and high-frequency data
+introduce microstructure noise. Carr and Wu (2003) sidestep this problem
+entirely by looking at option prices instead. Their key insight is that, although
+discretely sampled paths from the three process types look nearly identical, they
+have dramatically different implications for short-maturity option prices.
+
+\subsubsection*{The Core Method: Term Decay Plots}
+
+Under a risk-neutral measure, the asset price dynamics are modelled as:
+
+\begin{equation}
+    \frac{dS_t}{S_{t-}} = (r-q)\,dt + \sigma_t\,dW_t
+    + \int_{\mathbb{R}^0}(e^x - 1)\bigl[\mu(dx,dt) - \nu_t(x)\,dx\,dt\bigr]
+\end{equation}
+
+where $W_t$ is a standard Brownian motion, $\mu(dx,dt)$ counts jumps of log-size
+$x$, and $\nu_t(x)$ is the compensator (local jump density). The first stochastic
+term is the purely continuous martingale component; the integral is the purely
+discontinuous (jump) martingale component.
+
+The paper's main theoretical result decomposes the time value of a European
+option into two parts --- one driven by the continuous component and one by the
+jump component:
+
+\begin{equation}
+    TV_0(K,T) = e^{-rT}\int_0^T
+    \Bigl[\tfrac{1}{2}q(K,t)K^2\,\mathbb{E}_0[\sigma_t^2\,|\,F_{t-}=K]
+    + \mathbb{E}_0[F_{t-}\,\nu_t^0(k)]\Bigr]\,dt
+\end{equation}
+
+where $q(K,t)$ is the risk-neutral density of the forward price, $k=\ln(K/F_{t-})$
+is log-moneyness, and $\nu_t^0(k)$ is the double tail of the jump compensator.
+As $T\downarrow 0$, this decomposition reveals that the speed at which option
+prices converge to zero depends entirely on which components are present, as
+summarised in Table~\ref{tab:decay}.
+
+\begin{table}[h]
+\centering
+\caption{Asymptotic Decay Rates of Short-Maturity Option Prices}
+\label{tab:decay}
+\begin{tabular}{lll}
+\toprule
+Process Type & OTM Options & ATM Options \\
+\midrule
+Purely Continuous (PC)  & $O(e^{-c/T}),\;c>0$ & $O(\sqrt{T})$ \\
+Pure Jump (PJ)          & $O(T)$               & $O(T^p),\;p\in(0,1]$ \\
+Combined (CJ)           & $O(T)$               & $O(T^p),\;p\in(0,\tfrac{1}{2}]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The intuition is straightforward. Under a purely continuous process, an
+out-of-the-money option can only move in the money through gradual
+diffusion, which is exponentially unlikely over a very short horizon. When
+jumps are present, however, the stock can leap across the strike in a single
+instant, so OTM option prices decay only linearly in $T$. For ATM options,
+the $O(\sqrt{T})$ rate signals an infinite-variation component (either diffusion
+or an infinite-variation jump process), while $O(T)$ signals a pure finite-variation
+jump process.
+
+To apply the test empirically, the authors plot $\ln(P/T)$ against $\ln(T)$,
+calling this a \textit{term decay plot}. A flat slope near zero for OTM options
+signals a jump component; a strongly positive, concave curve signals a
+purely continuous process. For ATM options, a straight line with slope
+near $-0.5$ signals an infinite-variation component; a flat line signals
+finite-variation jumps only.
+
+\subsubsection*{Empirical Findings: S\&P 500 Index Options}
+
+Carr and Wu apply the method to daily S\&P 500 index option data from
+April 1999 to May 2000 (273 business days). They fit a second-order polynomial,
+
+\begin{equation}
+    \ln(P/T) = a(\ln T)^2 + b(\ln T) + c,
+\end{equation}
+
+to the term decay plot at each date and moneyness level, extracting slope
+and curvature estimates. The results clearly support a combined
+continuous-jump (CJ) process. OTM term decay plots are mostly flat at
+short maturities (slopes near zero), confirming the presence of a jump
+component. ATM term decay plots are consistently negatively sloped and
+approximately linear with slopes averaging $-0.413$, close to the
+$-0.5$ theoretical value for a continuous component, confirming that
+an infinite-variation component is always present. Importantly, the jump
+component varies substantially over time --- on some days it is almost
+undetectable --- while the continuous component is constantly and
+stably felt throughout the sample.
+
+\subsubsection*{Strengths, Limitations, and Relevance to QQQ Options}
+
+The main strength of the method is its robustness: it does not require a
+parametric model and is not confined to a Markovian or single-factor
+framework. It can detect the type of process directly from observable option
+prices, without needing high-frequency return data. The simulation evidence
+confirms that the asymptotic behavior is visible for options maturing within
+20 days, which are readily available in liquid markets.
+
+The main limitation is that the test cannot always distinguish between a
+continuous martingale and an infinite-variation pure jump process, since
+both generate a similar $O(\sqrt{T})$ ATM decay rate. The method also
+operates under the assumption that the compensator $\sigma_t$ and $\nu_t$
+are bounded near $t=0$; deterministically explosive volatility could
+mimic jump-like decay even in a purely continuous model.
+
+For our project on QQQ options, the Carr and Wu framework provides
+direct empirical motivation for including a jump component in the pricing
+model. The NASDAQ-100's technology-heavy composition makes it prone
+to sudden, large price moves, and if QQQ option prices exhibit the flat
+short-maturity OTM decay pattern documented here, this constitutes
+market-based evidence that jumps are priced into the index. The finding
+that the continuous component is always present further supports the use
+of combined jump-diffusion models --- such as Merton (1976) or Kou (2002)
+--- rather than pure jump specifications. The time-variation in the jump
+component also suggests that models with stochastic jump intensity may
+be necessary for capturing the full dynamics of the QQQ implied volatility
+surface across different market regimes.
+
+\end{document}
