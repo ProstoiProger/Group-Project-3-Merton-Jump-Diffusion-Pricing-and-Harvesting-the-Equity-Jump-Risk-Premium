@@ -303,6 +303,63 @@ and
 \end{equation}
 Substituting Equations~\eqref{eq:merton_jump_cf} and~\eqref{eq:merton_kappa} into Equation~\eqref{eq:general_cf} gives the Merton characteristic function used in our COS engine.
 
+\subsection*{Merton Pricing Formula}
+
+For a European call option with payoff $(S_T-K)^+$, the risk-neutral price is
+\begin{equation}
+C(t,S_t)=e^{-r\tau}\mathbb{E}_t^{\mathbb{Q}}[(S_T-K)^+].
+\label{eq:risk_neutral_call}
+\end{equation}
+The key step is to condition on the number of jumps. Since $N_\tau\sim \mathrm{Poisson}(\lambda\tau)$,
+\begin{equation}
+C(t,S_t)=\sum_{n=0}^{\infty}\mathbb{P}(N_\tau=n)\,
+ e^{-r\tau}\mathbb{E}_t^{\mathbb{Q}}[(S_T-K)^+\mid N_\tau=n].
+\label{eq:condition_on_n}
+\end{equation}
+Conditional on $N_\tau=n$, the sum of log-jumps is normal:
+\begin{equation}
+\sum_{i=1}^{n}J_i\sim N(n\mu_J,n\sigma_J^2).
+\end{equation}
+Thus, conditional on $n$ jumps, the terminal log-price is still normally distributed. It can be represented as a Black--Scholes log-price with adjusted volatility
+\begin{equation}
+\sigma_n^2=\sigma^2+\frac{n\sigma_J^2}{\tau},
+\label{eq:sigma_n}
+\end{equation}
+and adjusted drift parameter
+\begin{equation}
+r_n=r-\lambda\kappa+\frac{n\mu_J}{\tau}+\frac{n\sigma_J^2}{2\tau}.
+\label{eq:r_n}
+\end{equation}
+The conditional Black--Scholes representation is discounted at $r_n$, while the original risk-neutral payoff in Equation~\eqref{eq:risk_neutral_call} is discounted at $r$. Therefore the conditional price contributes an additional factor $e^{(r_n-r)\tau}$. Using Equation~\eqref{eq:r_n},
+\begin{equation}
+e^{(r_n-r)\tau}
+=\exp\left(-\lambda\kappa\tau+n\mu_J+\frac12n\sigma_J^2\right)
+=e^{-\lambda\kappa\tau}(1+\kappa)^n,
+\label{eq:rn_adjustment}
+\end{equation}
+because $1+\kappa=\exp(\mu_J+\frac12\sigma_J^2)$. Hence
+\begin{equation}
+e^{-\lambda\tau}\frac{(\lambda\tau)^n}{n!}e^{(r_n-r)\tau}
+=
+e^{-\lambda(1+\kappa)\tau}
+\frac{(\lambda(1+\kappa)\tau)^n}{n!}.
+\label{eq:lambda_prime_derivation}
+\end{equation}
+Defining $\lambda'=\lambda(1+\kappa)$, the Merton price becomes
+\begin{equation}
+C^{\mathrm{Merton}}(S,K,\tau)
+=\sum_{n=0}^{\infty}
+e^{-\lambda'\tau}\frac{(\lambda'\tau)^n}{n!}
+C^{\mathrm{BS}}(S,K,\tau,r_n,\sigma_n),
+\label{eq:merton_price_formula}
+\end{equation}
+where
+\begin{equation}
+\lambda'=\lambda(1+\kappa)=\lambda\exp\left(\mu_J+\frac12\sigma_J^2\right).
+\label{eq:lambda_prime}
+\end{equation}
+This formula is useful twice in our project. First, it provides a fast semi-closed-form benchmark for European option prices. Second, it will be used as a control variate and validation target for the Monte Carlo and COS implementations.
+
 \begin{thebibliography}{99}
 
 \bibitem[Merton(1976)]{Merton1976}
