@@ -1,0 +1,163 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{parskip}
+\usepackage{times}
+
+\geometry{top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
+\linespread{1.1}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3.5pt}
+
+\begin{document}
+
+% ================================================================
+\subsection*{Self-Exciting Hawkes Jump Models}
+% ================================================================
+
+% ----------------------------------------------------------------
+\subsubsection*{Introduction to the Paper}
+% ----------------------------------------------------------------
+
+A key challenge in modelling oil prices is that large price
+movements do not arrive independently. In practice, a sudden
+crash tends to trigger further extreme moves shortly afterwards
+--- a feature known as \textit{jump clustering}. Standard
+jump-diffusion models handle jumps through a Poisson process with
+a \textit{fixed} arrival rate, which cannot reproduce this
+behaviour. Gonzato and Sgarra (2020) address this by proposing a
+\textit{self-exciting} jump-diffusion model where the jump
+intensity is stochastic and path-dependent: it rises after each
+jump and gradually decays back to a long-run background level.
+Combined with stochastic volatility and a stochastic convenience
+yield, the model is far more realistic than earlier factor models
+and is shown to improve both in-sample fit and out-of-sample
+futures forecasting for WTI crude oil data from 2008 to 2018.
+
+% ----------------------------------------------------------------
+\subsubsection*{What the Paper Introduced}
+% ----------------------------------------------------------------
+
+The key building block is the \textit{Hawkes process}, whose
+conditional intensity $\lambda_t$ satisfies:
+\begin{equation}
+    d\lambda_t = \beta(\lambda_{\infty} - \lambda_t)\,dt
+    + \alpha\,dN_t,
+\end{equation}
+where $\lambda_\infty>0$ is the background intensity, $\beta>0$
+controls the speed of decay after a jump, and $\alpha>0$ is the
+magnitude of the self-exciting spike caused by each new event
+$dN_t$. Every jump immediately raises $\lambda_t$ by $\alpha$,
+making the next jump more likely; the effect then fades
+exponentially, so calm periods are also possible. This reproduces
+\textit{jump clustering} directly through the model structure.
+The log-price $x_t = \ln(S_t/S_0)$ follows:
+\begin{equation}
+    dx_t = \!\left(\mu - \tfrac{1}{2}V_t
+    - \lambda_t\mathbb{E}[e^{J_x}-1]
+    - \delta_t\right)dt
+    + \sqrt{V_t}\,dW_t + dJ_{x,t},
+\end{equation}
+where $V_t$ is a CIR-type stochastic variance that co-jumps with
+the price, and $\delta_t$ is an Ornstein--Uhlenbeck convenience
+yield. The affine structure of the system allows futures prices
+to be computed in closed form, greatly simplifying estimation.
+
+% ----------------------------------------------------------------
+\subsubsection*{Why Hawkes Processes Matter}
+% ----------------------------------------------------------------
+
+In a standard Poisson model, the jump probability on any given
+day is independent of the past, which is clearly unrealistic.
+After a major oil market shock --- a geopolitical event, a supply
+disruption --- uncertainty stays elevated and further large moves
+remain more likely for days or weeks. Hawkes processes model this
+\textit{financial contagion} directly: each jump raises the
+intensity, so consecutive extreme events are more probable.
+This makes them far better suited than constant-intensity models
+for capturing the turbulent, clustered dynamics that dominate
+oil markets during crises, and for producing realistic estimates
+of tail risk and derivative prices.
+
+% ----------------------------------------------------------------
+\subsubsection*{Bayesian Estimation and Sequential Monte Carlo}
+% ----------------------------------------------------------------
+
+Estimation is complicated by the fact that $V_t$, $\delta_t$,
+and $\lambda_t$ are all \textit{latent states} that cannot be
+observed directly. The authors use the \textit{two-stage
+Sequential Monte Carlo (SMC) sampler}: a swarm of weighted random
+samples (\textit{particles}) approximates the posterior of the
+parameters and latent states, being gradually tempered from the
+prior to the posterior via adaptive importance sampling and
+resampling. A first stage with $M_1=30$ state particles explores
+the parameter space cheaply; a second stage with $M_2=500$
+particles corrects the approximation. The method also delivers
+the marginal likelihood, enabling formal Bayes-factor model
+comparison --- something that would be very difficult with
+classical maximum-likelihood approaches given the non-linear,
+non-Gaussian state-space structure.
+
+% ----------------------------------------------------------------
+\subsubsection*{Empirical Results}
+% ----------------------------------------------------------------
+
+Applied to 2{,}767 daily WTI observations (spot plus eight
+futures contracts, 2008--2018), the results strongly support
+self-excitation. Log-returns exhibit kurtosis of $7.31$ and fail
+the Jarque--Bera normality test. \textbf{Model~I} (Hawkes
+dynamics) is compared to \textbf{Model~II} (constant intensity,
+$\alpha=\beta=0$): the log Bayes factor equals $9.13$,
+constituting \textit{decisive} evidence for Model~I. The
+self-excitation parameter is estimated at $\hat{\alpha}=135.19$
+(SD~$5.02$), confirming that jump clustering is a genuine feature
+of the oil market. Out of sample, Model~I also achieves lower
+Mean Absolute Error in futures pricing across all maturities.
+
+% ----------------------------------------------------------------
+\subsubsection*{Strengths of the Paper}
+% ----------------------------------------------------------------
+
+The paper models jump dynamics in a flexible and realistic way,
+with the Hawkes intensity adapting automatically to market
+conditions. Stochastic volatility with co-jumps captures the
+leverage effect, and the affine structure keeps futures pricing
+analytically tractable. The model also has clear practical value:
+two optimal time-varying hedge ratios are derived, and the
+skewness-adjusted variance--skewness strategy outperforms pure
+minimum-variance hedging both in and out of sample.
+
+% ----------------------------------------------------------------
+\subsubsection*{Limitations of the Paper}
+% ----------------------------------------------------------------
+
+The main drawbacks are computational. Running the two-stage SMC
+sampler is resource-intensive, and the large number of parameters
+increases calibration difficulty and the risk of overfitting.
+Results may also be somewhat sensitive to the choice of prior
+distributions, even though the authors report low prior
+sensitivity for most parameters. Overall, the Hawkes framework
+is considerably harder to implement than a standard
+constant-intensity model, which may limit its practical adoption.
+
+% ----------------------------------------------------------------
+\subsubsection*{Connection to Our Project}
+% ----------------------------------------------------------------
+
+This paper is directly relevant because technology-heavy markets
+like QQQ also exhibit clustered extreme movements: crashes tend
+to arrive in waves rather than as isolated events. The Merton
+model assumes constant Poisson intensity and therefore
+underestimates the probability of consecutive large moves, while
+the Kou model improves jump asymmetry but keeps the intensity
+fixed. Hawkes-type models represent a natural frontier extension,
+allowing the intensity to respond dynamically to market shocks.
+Although implementing a full SMC-based self-exciting model is
+beyond the scope of this project, understanding how Hawkes
+processes extend traditional jump-diffusion frameworks provides
+important context for interpreting the results obtained with the
+Merton and Kou models and motivates the modelling choices made
+throughout the report.
+
+\end{document}

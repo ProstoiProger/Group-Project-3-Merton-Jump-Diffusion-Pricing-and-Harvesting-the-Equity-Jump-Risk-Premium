@@ -1,0 +1,139 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\geometry{margin=1in}
+\setstretch{1.2}
+
+\begin{document}
+
+\subsection*{Eraker, Johannes, and Polson (2003): The Impact of Jumps in Volatility and Returns}
+
+\subsubsection*{Introduction}
+
+A well-documented finding in the literature is that models combining diffusive
+stochastic volatility with jumps in returns --- such as the SVJ model of Bates
+(1996) --- are still misspecified. The core problem is that volatility in these models
+can only move gradually, driven by normally distributed diffusion shocks, yet
+empirical data shows that conditional volatility can increase very rapidly around
+periods of market stress. Eraker, Johannes, and Polson (2003) address this gap
+by introducing jumps directly into the volatility process, arguing that such a
+factor is rapidly moving, like jumps in returns, but also persistent, unlike them.
+The paper provides the first likelihood-based empirical evidence for the presence
+of volatility jumps using S\&P~500 and Nasdaq~100 index return data.
+
+\subsubsection*{The Model}
+
+The paper considers four nested models. Writing $Y_t = \log S_t$ for the
+log-price and $V_t$ for the instantaneous variance, the most general dynamics are:
+
+\begin{equation}
+\begin{pmatrix} dY_t \\ dV_t \end{pmatrix}
+= \begin{pmatrix} \mu \\ \kappa(\theta - V_{t-}) \end{pmatrix} dt
++ \sqrt{V_{t-}}
+\begin{pmatrix} 1 & 0 \\ \rho\,\sigma_v & \sqrt{1-\rho^2}\cdot\sigma_v \end{pmatrix}
+dW_t
++\begin{pmatrix} \xi^y\,dN_t^y \\ \xi^v\,dN_t^v \end{pmatrix}
+\end{equation}
+
+where $W_t$ is a standard Brownian motion in $\mathbb{R}^2$, $N_t^y$ and $N_t^v$
+are Poisson processes with intensities $\lambda_y$ and $\lambda_v$, and $\xi^y$,
+$\xi^v$ are the jump sizes in returns and volatility respectively. This nests four
+models: the pure stochastic volatility model \textbf{SV} (no jumps), the
+\textbf{SVJ} model (jumps in returns only, $\xi^v\sim N(\mu_y,\sigma_y^2)$,
+$\lambda_v=0$), the \textbf{SVCJ} model (contemporaneous jumps in both returns
+and volatility, $N_t^y=N_t^v=N_t$, with $\xi^v\sim\text{Exp}(\mu_v)$ and
+$\xi^y|\xi^v\sim N(\mu_y+\rho_J\xi^v,\sigma_y^2)$), and the \textbf{SVIJ} model
+(independent jumps in returns and volatility). The exponential distribution for
+volatility jump sizes guarantees $V_t$ stays positive and captures the large
+upward spikes in volatility observed empirically.
+
+The intuition behind including volatility jumps is straightforward. Jumps in
+returns generate large discrete moves but have no lasting impact on future
+return distributions. Diffusive volatility is persistent but moves slowly.
+Volatility jumps combine both features: they arrive suddenly and cause an
+immediate, large increase in $V_t$, which then mean-reverts gradually back to
+its long-run level. This gives the model a mechanism to generate the kind of
+rapid, persistent volatility increases observed around crash episodes.
+
+\subsubsection*{Estimation via MCMC}
+
+The paper estimates all four models using Markov Chain Monte Carlo (MCMC),
+a likelihood-based approach that simultaneously recovers parameters, latent spot
+volatilities, jump times, and jump sizes from the return time series. This goes
+beyond standard calibration methods, which only estimate parameters and treat
+volatility as unobserved. The MCMC posterior distribution is:
+
+\begin{equation}
+p(\Theta, J, \xi^y, \xi^v, V \mid Y)
+\;\propto\; p(Y \mid \Theta, J, \xi^y, \xi^v, V)\, p(\Theta, J, \xi^y, \xi^v, V)
+\end{equation}
+
+where $J$, $\xi^y$, $\xi^v$, and $V$ are vectors of jump times, jump sizes,
+and spot volatilities over the sample. The algorithm iteratively draws from the
+conditional posteriors of each block, producing samples that fully quantify
+parameter and volatility estimation uncertainty. Model comparison is carried out
+using log-Bayes factors, which penalise model complexity automatically and
+require no appeal to asymptotic distributions.
+
+\subsubsection*{Empirical Results and Option Pricing Implications}
+
+Estimated on daily S\&P~500 returns from 1980 to 1999, the SV model is
+severely misspecified: generating the $-23\%$ crash return of October 1987
+requires an almost eight standard deviation diffusion shock. Adding jumps in
+returns (SVJ) improves the fit but introduces clustered jump arrivals during the
+crash week --- three estimated jumps in a single week --- which contradicts the
+i.i.d.\ Poisson assumption. Log-Bayes factors strongly favour the models with
+volatility jumps: the log-Bayes factor comparing SV to SVIJ is $59.45$ for the
+S\&P and $56.03$ for the Nasdaq, constituting overwhelming evidence. In the
+SVCJ model, the 1987 crash is explained by a single return jump of $-14\%$
+combined with a volatility jump that pushed $V_t$ from $40\%$ to over $50\%$,
+a much more economically coherent picture than the SVJ model's cluster of jumps.
+
+For option pricing, jumps in returns steepen the slope of the implied volatility
+curve, while volatility jumps additionally raise implied volatility for deep
+in-the-money options, producing the characteristic hook or ``tipping at the end''
+effect documented by Duffie, Pan, and Singleton (2000). The SV model generates
+a nearly flat implied volatility curve because it produces negligible conditional
+non-normalities at short horizons. Estimation risk also matters: spot volatility
+uncertainty dominates option price uncertainty for short-dated at-the-money
+options, while parameter uncertainty dominates for out-of-the-money options and
+long maturities.
+
+\subsubsection*{Strengths, Limitations, and Relevance to QQQ Options}
+
+The paper's main contribution is providing direct empirical evidence, from
+return data alone, that both types of jumps are necessary components of a
+well-specified model. The MCMC approach is a genuine methodological advance
+because it recovers the full time series of latent states, making it possible to
+attribute specific market episodes to specific model components. The use of long
+samples spanning the 1987, 1997, and 1998 stress episodes is especially valuable
+for identifying rare jump events that shorter option-based studies miss.
+
+The main limitations follow those of the simpler jump-diffusion models. Jump
+intensities $\lambda_y$ and $\lambda_v$ are kept constant, so the model cannot
+capture the time-varying crash risk that is visible in option markets. The constant
+intensity assumption is directly contradicted by the paper's own finding that the
+jump component varies strongly over time, echoing the conclusion of Carr and Wu
+(2003). Calibration using only return data also means that risk premia embedded
+in option prices are not directly estimated, which limits the model's immediate
+use for option pricing without additional assumptions.
+
+For our QQQ project, the Eraker et al.\ framework provides important context.
+The Nasdaq~100 results in the paper show that Nasdaq volatility is systematically
+higher and more volatile than S\&P volatility, with jumps arriving roughly three
+times more frequently. This is consistent with the technology-heavy composition
+of the QQQ and reinforces the need for a model that allows both return and
+volatility jumps. The finding that jumps in volatility, not diffusive stochastic
+volatility, are the primary drivers of market stress episodes suggests that option
+pricing models applied to QQQ should allow for stochastic and jump-driven
+volatility to avoid the systematic mispricing of short-dated out-of-the-money
+puts that simpler models produce.
+
+\end{document}

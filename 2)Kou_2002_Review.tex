@@ -1,0 +1,113 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+
+\geometry{margin=0.8in}
+\setstretch{1.2}
+
+\begin{document}
+
+\subsection*{Kou (2002): A Jump-Diffusion Model for Option Pricing}
+
+\subsubsection*{Introduction}
+
+The Black--Scholes model assumes log-normally distributed asset returns, but two
+well-documented empirical failures motivate Kou (2002). First, real return distributions
+exhibit a \textit{leptokurtic} shape: a higher peak and heavier, asymmetric tails than
+the normal distribution. Second, implied volatilities backed out from market prices are
+not flat across strikes but form a convex \textit{volatility smile}, meaning Black--Scholes
+systematically underprices options with extreme strikes. Kou proposes a double exponential
+jump-diffusion model that addresses both problems while retaining analytical tractability
+for a wide class of derivatives.
+
+\subsubsection*{The Double Exponential Jump-Diffusion Model}
+
+The stock price is governed by:
+
+\begin{equation}
+    \frac{dS(t)}{S(t^{-})} = \mu\,dt + \sigma\,dW(t)
+    + d\!\left(\sum_{i=1}^{N(t)}(V_i - 1)\right)
+\end{equation}
+
+where $W(t)$ is a standard Brownian motion, $N(t)$ a Poisson process with intensity
+$\lambda$, and $\{V_i\}$ i.i.d.\ non-negative jump multipliers independent of $W(t)$ and
+$N(t)$. The log-jump size $Y = \log V$ follows an asymmetric double exponential
+distribution:
+
+\begin{equation}
+    f_Y(y) = p\,\eta_1 e^{-\eta_1 y}\mathbf{1}_{\{y\geq 0\}}
+           + q\,\eta_2 e^{\eta_2 y}\mathbf{1}_{\{y < 0\}},
+    \qquad \eta_1>1,\;\eta_2>0
+\end{equation}
+
+where $p+q=1$ are the probabilities of upward and downward jumps, with mean jump sizes
+$1/\eta_1$ and $1/\eta_2$ respectively. The constraint $\eta_1>1$ ensures finite expected
+stock price. By choosing $q>p$ and calibrating $\eta_2$ independently of $\eta_1$, the
+model captures the empirically observed asymmetry between large negative and positive
+moves --- something the symmetric normal jumps in Merton (1976) cannot reproduce.
+
+\subsubsection*{Why Double Exponential: Intuition and Tractability}
+
+The double exponential distribution is motivated on two grounds. Economically, it links
+to behavioral finance: the heavy tails model investor \textit{overreaction} to news
+(large jumps), while the high peak models \textit{underreaction} (small price responses).
+The asymmetry between upward and downward components directly explains the volatility
+skew, since higher probability of large downward jumps inflates implied volatility for
+low-strike puts.
+
+Mathematically, the key advantage is the \textit{memoryless property} of the exponential
+distribution. When a jump process crosses a barrier, it often overshoots. Computing the
+exact distribution of this overshoot is generally intractable, but for exponential jump
+sizes the memoryless property gives a closed-form overshoot distribution and ensures the
+overshoot is conditionally independent of the first passage time. This is precisely why
+the Kou model yields analytical solutions for barrier, lookback, and perpetual American
+options, while the Merton model with normal jumps cannot.
+
+For European options, the pricing formula uses the $Hh$ function:
+
+\begin{equation}
+    Hh_n(x) = \frac{1}{n!}\int_x^{\infty}(t-x)^n e^{-t^2/2}\,dt,
+    \qquad n = 0,1,2,\ldots
+\end{equation}
+
+which satisfies a simple three-term recursion and is computed efficiently from the
+standard normal distribution. In practice, truncating the series to ten to fifteen
+terms gives accurate results.
+
+\subsubsection*{Strengths, Limitations, and Importance}
+
+The model's principal strengths are its analytical tractability across vanilla and
+path-dependent derivatives, its asymmetric jump structure that fits the volatility skew,
+and the clear economic interpretation of all parameters ($\lambda$ is mean jumps per year;
+$p, q$ are jump direction probabilities; $1/\eta_i$ are mean jump sizes). It improves on
+Merton (1976) both empirically and mathematically, and it can be embedded in a rational
+expectations equilibrium, making its pricing formula preference-free.
+
+The main limitations mirror those of the Merton model. The constant jump intensity
+$\lambda$ cannot capture time-varying crash risk, and the Poisson independence assumption
+rules out volatility clustering. The constant diffusion volatility $\sigma$ ignores the
+well-documented mean-reversion of return volatility; models combining stochastic
+volatility with jumps, such as Bates (1996), address this. The market remains incomplete
+under jump dynamics, so additional equilibrium assumptions are needed to uniquely pin
+down prices.
+
+\subsubsection*{Relevance to QQQ Options}
+
+The QQQ ETF tracks the NASDAQ-100, a technology-heavy index prone to large, sudden
+price moves driven by earnings surprises, regulatory decisions, and product announcements.
+The QQQ implied volatility surface shows a pronounced downside skew, with
+out-of-the-money puts carrying materially higher implied volatilities than at-the-money
+options. The Kou model's asymmetric jump structure is well suited to match this pattern
+by assigning higher probability and larger size to downward jumps through the parameters
+$q$ and $\eta_2$. We calibrate $(\sigma, \lambda, p, \eta_1, \eta_2)$ to the QQQ option
+cross-section and compare the fit against Black--Scholes and Merton. The Kou model is
+expected to outperform both benchmarks for short-maturity, far-from-the-money options, especially on the put side, while converging toward the Merton fit for longer-dated near-the-money contracts where the diffusion component dominates.
+
+\end{document}

@@ -1,0 +1,101 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\geometry{margin=1in}
+\setstretch{1.2}
+
+\begin{document}
+
+\subsection*{Merton (1976): Option Pricing When Underlying Stock Returns Are Discontinuous}
+
+\subsubsection*{Introduction}
+
+The Black--Scholes model prices European options assuming stock prices follow a geometric
+Brownian motion with continuous sample paths --- no sudden jumps. While Merton (1973) showed
+the formula is robust to several other assumptions, continuity of the price path is essential:
+it is what makes the perfect hedge possible. In practice, however, stock prices respond
+discontinuously to earnings surprises, regulatory rulings, and macroeconomic shocks, producing
+return distributions with far heavier tails than the log-normal model predicts. Merton (1976)
+extends the framework by incorporating a jump component directly into the price process.
+
+\subsubsection*{The Jump-Diffusion Model}
+
+The stock price dynamics are governed by:
+
+\begin{equation}
+    \frac{dS_t}{S_t} = (\alpha - \lambda k)\,dt + \sigma\,dZ_t + dq_t
+\end{equation}
+
+where $\alpha$ is the expected return, $\sigma^2$ the diffusion variance (conditional on no
+jump), $dZ_t$ a standard Wiener process, and $dq_t$ a Poisson jump component with intensity
+$\lambda$ (mean jumps per unit time). On each jump the stock moves from $S_t$ to $S_t Y$,
+where $Y>0$ is a random multiplier with $k \equiv \mathbb{E}(Y-1)$; the $\lambda k$ correction
+keeps the total expected return equal to $\alpha$. Setting $\lambda = 0$ recovers Black--Scholes
+exactly. The Poisson process is the natural choice for jump timing: its memoryless property
+reflects the informational efficiency requirement that the arrival of market-moving news be
+unpredictable.
+
+\subsubsection*{Option Pricing and the Breakdown of the Black--Scholes Hedge}
+
+When a jump occurs, the stock price moves discontinuously and the option value responds
+nonlinearly. Because portfolio replication is a linear operation, no combination of stock and
+bond can hedge this nonlinear jump exposure, making the market \textit{incomplete}. Merton
+resolves the indeterminacy by assuming jump risk is firm-specific and therefore
+non-systematic (diversifiable). Under the CAPM, a zero-beta portfolio must earn the risk-free
+rate, which yields the integro-differential pricing equation:
+
+\begin{equation}
+    0 = \tfrac{1}{2}\sigma^2 S^2 F_{SS} + (r - \lambda k)\,S F_S - F_\tau - rF
+      + \lambda\,\mathbb{E}\bigl\{F(SY,\tau) - F(S,\tau)\bigr\}
+\end{equation}
+
+with $F(0,\tau)=0$ and $F(S,0)=\max[0,\,S-E]$. The equation is preference-free and reduces to
+the Black--Scholes PDE when $\lambda=0$. For log-normally distributed jump sizes with
+$\mathbb{E}(Y)=1$ and $\mathrm{Var}(\ln Y)=\delta^2$, the closed-form solution is:
+
+\begin{equation}
+    F(S,\tau) = \sum_{n=0}^{\infty}
+    \frac{e^{-\lambda\tau}(\lambda\tau)^n}{n!}\;
+    W\!\left(S,\tau;\,E,\,\sigma^2+\frac{n\delta^2}{\tau},\,r\right)
+\end{equation}
+
+where $W(\cdot)$ is the Black--Scholes formula. The price is a Poisson-weighted average of
+Black--Scholes prices, one for each possible number of jumps $n$, each evaluated at an inflated
+variance $\sigma^2 + n\delta^2/\tau$ that reflects the additional uncertainty from $n$ jumps.
+
+\subsubsection*{Implications, Strengths, and Limitations}
+
+Equation~(3) explains the \textit{volatility smile}: deep out-of-the-money options are
+underpriced by Black--Scholes because a single large jump can push the stock past the strike
+instantly, a scenario a continuous diffusion nearly cannot produce over short horizons. This
+generates the well-known pattern of implied volatilities that rise away from the money. More
+broadly, the jump-diffusion process produces excess kurtosis consistent with empirical return
+distributions.
+
+The model's key strengths are its analytical tractability (the series converges rapidly and
+each term is a Black--Scholes price), its clear economic interpretation (Poisson arrivals
+reflect unpredictable firm-specific news), and its role as the foundation for a large family
+of later models. Its main limitations are the constant jump intensity $\lambda$ (unable to
+capture time-varying crash risk or volatility clustering), the symmetric log-normal jump
+distribution (unable to match the steep downside skew of index options), and the absence of
+stochastic volatility, all of which are addressed in extensions such as Bates (1996).
+
+\subsubsection*{Relevance to QQQ Options}
+
+The QQQ ETF tracks the NASDAQ-100, a technology-heavy index particularly susceptible to
+jump-like behaviour. The implied volatility surface extracted from QQQ options displays a
+pronounced downside skew --- out-of-the-money puts carry significantly higher implied
+volatilities than at-the-money options --- consistent with equation~(3). We calibrate
+$(\sigma,\lambda,\delta^2)$ to the observed QQQ cross-section and compare the fit to
+Black--Scholes. The jump-diffusion model is expected to outperform for short-maturity,
+far-from-the-money options where jump risk is most material, and to converge to the
+Black--Scholes fit for longer-dated near-the-money contracts.
+
+\end{document}
