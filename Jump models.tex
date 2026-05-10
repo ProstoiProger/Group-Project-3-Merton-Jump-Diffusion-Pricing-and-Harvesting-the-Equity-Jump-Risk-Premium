@@ -189,6 +189,120 @@ W_t^{\mathbb{Q}}=W_t^{\mathbb{P}}+\theta t.
 \label{eq:girsanov_density}
 \end{equation}
 Then $W_t^{\mathbb{Q}}$ is a Brownian motion under $\mathbb{Q}$, and the Brownian drift can be adjusted so that the discounted stock price is a martingale. In a pure diffusion model this would pin down the unique risk-neutral measure. In a jump-diffusion model, however, the jump intensity and jump-size distribution may also change under the pricing measure. Since jump risk is not perfectly hedgeable, no-arbitrage does not determine this jump-risk adjustment uniquely. For this reason, our empirical implementation estimates physical jump parameters from returns but calibrates risk-neutral jump parameters directly from option prices. This is the practical link between Girsanov's theorem, market incompleteness, and the jump risk premium discussed in this project \citep{Shreve2004}.
+
+\subsection*{From the Log-Price to the Stock-Price SDE}
+
+Define the log-price process
+\begin{equation}
+X_t=\log S_t.
+\label{eq:log_price}
+\end{equation}
+For a finite-activity jump-diffusion, the risk-neutral log-price dynamics are
+\begin{equation}
+dX_t=
+\left(r-\lambda\kappa-\frac{1}{2}\sigma^2\right)dt
++\sigma dW_t^{\mathbb{Q}}+JdN_t.
+\label{eq:log_sde}
+\end{equation}
+The term $-\frac{1}{2}\sigma^2$ is the usual It\^{o} correction from geometric Brownian motion, while $-\lambda\kappa$ compensates for the average jump growth.
+
+To recover the stock-price dynamics, apply It\^{o}'s formula for jump processes to $S_t=e^{X_t}$. Between jumps, the continuous part gives
+\begin{equation}
+\frac{dS_t}{S_t}=
+\left(r-\lambda\kappa\right)dt+\sigma dW_t^{\mathbb{Q}}.
+\end{equation}
+At a jump time, $\Delta X_t=J$, hence
+\begin{equation}
+\Delta S_t=S_{t^-}(e^J-1).
+\end{equation}
+Combining the continuous and jump parts gives exactly
+\begin{equation}
+\frac{dS_t}{S_{t^-}}=
+(r-\lambda\kappa)dt+\sigma dW_t^{\mathbb{Q}}+(e^J-1)dN_t,
+\label{eq:merton_sde_final}
+\end{equation}
+which is the Merton jump-diffusion SDE used throughout the project.
+
+\subsection*{Martingale Condition}
+
+The risk-neutral drift in Equation~\eqref{eq:merton_sde_final} is chosen so that the discounted price $e^{-rt}S_t$ is a $\mathbb{Q}$-martingale. Let $\tau=T-t$. Solving Equation~\eqref{eq:log_sde} over $[t,T]$ gives
+\begin{equation}
+S_T=S_t\exp\left[
+\left(r-\lambda\kappa-\frac{1}{2}\sigma^2\right)\tau
++\sigma(W_T^{\mathbb{Q}}-W_t^{\mathbb{Q}})
++\sum_{i=1}^{N_\tau}J_i
+\right].
+\label{eq:st_solution}
+\end{equation}
+Since the Brownian and jump parts are independent,
+\begin{align}
+\mathbb{E}_t^{\mathbb{Q}}[S_T]
+&=S_t e^{(r-\lambda\kappa-\frac12\sigma^2)\tau}
+\mathbb{E}^{\mathbb{Q}}\!\left[e^{\sigma(W_T-W_t)}\right]
+\mathbb{E}^{\mathbb{Q}}\!\left[e^{\sum_{i=1}^{N_\tau}J_i}\right].
+\end{align}
+The Brownian expectation is
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}\!\left[e^{\sigma(W_T-W_t)}\right]
+=e^{\frac12\sigma^2\tau},
+\end{equation}
+and the compound Poisson expectation is
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}\!\left[e^{\sum_{i=1}^{N_\tau}J_i}\right]
+=\exp\left(\lambda\tau\bigl(\mathbb{E}^{\mathbb{Q}}[e^J]-1\bigr)\right)
+=e^{\lambda\kappa\tau}.
+\end{equation}
+Therefore,
+\begin{equation}
+\mathbb{E}_t^{\mathbb{Q}}[S_T]=S_t e^{r\tau},
+\end{equation}
+and hence
+\begin{equation}
+\mathbb{E}_t^{\mathbb{Q}}\left[e^{-r(T-t)}S_T\right]=S_t.
+\label{eq:martingale_result}
+\end{equation}
+Thus the discounted stock price is a martingale under $\mathbb{Q}$, which is the no-arbitrage condition needed for risk-neutral valuation.
+
+\subsection*{Characteristic Function of the Merton Model}
+
+Fourier and COS pricing methods require the characteristic function of $X_T=\log S_T$. From Equation~\eqref{eq:st_solution}, for any real $u$,
+\begin{equation}
+\begin{aligned}
+\phi_X(u;t,T)
+&= \mathbb{E}_t^{\mathbb{Q}}\!\left[e^{iuX_T}\right] \\
+&= \exp\!\Bigg(
+iu\Big[x_t+\Big(r-\lambda\kappa-\tfrac12\sigma^2\Big)\tau\Big]
+-\tfrac12\sigma^2u^2\tau \\
+&\qquad\qquad
++\lambda\tau\big(\Psi_J(u)-1\big)
+\Bigg).
+\end{aligned}
+\label{eq:general_cf}
+\end{equation}
+where
+\begin{equation}
+\Psi_J(u)=\mathbb{E}^{\mathbb{Q}}[e^{iuJ}]
+\label{eq:jump_cf}
+\end{equation}
+is the characteristic function of the log-jump size.
+
+In the Merton model,
+\begin{equation}
+J\sim N(\mu_J,\sigma_J^2).
+\end{equation}
+Therefore,
+\begin{equation}
+\Psi_J(u)=\exp\left(iu\mu_J-\frac12u^2\sigma_J^2\right),
+\label{eq:merton_jump_cf}
+\end{equation}
+and
+\begin{equation}
+\kappa=\mathbb{E}[e^J-1]
+=\exp\left(\mu_J+\frac12\sigma_J^2\right)-1.
+\label{eq:merton_kappa}
+\end{equation}
+Substituting Equations~\eqref{eq:merton_jump_cf} and~\eqref{eq:merton_kappa} into Equation~\eqref{eq:general_cf} gives the Merton characteristic function used in our COS engine.
+
 \begin{thebibliography}{99}
 
 \bibitem[Merton(1976)]{Merton1976}
