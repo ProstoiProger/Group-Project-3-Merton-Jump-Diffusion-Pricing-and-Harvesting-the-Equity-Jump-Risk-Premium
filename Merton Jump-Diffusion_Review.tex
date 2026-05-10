@@ -1,0 +1,166 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+\begin{document}
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Huge \textbf{Merton Jump-Diffusion: Pricing and Harvesting
+the Equity Jump Risk Premium} \par}
+    \vspace{0.5cm}
+    {\large Stochastic Processes --- Group 3 --- W1: Literature Review \par}
+    \vspace{2cm}
+    {\Large Research Lead \par}
+    \vspace{1cm}
+    {\large May 5, 2026 \par}
+    \vfill
+    
+\end{titlepage}
+
+\section*{Literature Review}
+
+The literature on asset price modelling has evolved considerably over the past five decades, moving well beyond the classical Black--Scholes framework in response to persistent empirical evidence that real financial markets are richer and more complex than any simple diffusion model can capture. This review traces that evolution across four connected areas. We begin with the foundational jump-diffusion models of Merton (1976) and Kou (2002), which introduced discontinuous price dynamics into option pricing theory, and the empirical diagnostics of Carr and Wu (2003), which confirmed that jumps are genuinely present in market data. We then turn to Eraker, Johannes, and Polson (2003), who demonstrated that both return jumps and volatility jumps are needed to fit index data, and discuss how self-exciting Hawkes processes extend this insight by allowing jump intensity to vary endogenously. Finally, we review the deep learning approach of Agram, \O{}ksendal, and Rems (2024), who address the hedging problem in incomplete jump-diffusion markets using neural network methods.
+
+\subsection*{Classical Jump-Diffusion Processes}
+
+The starting point for any study of discontinuous price dynamics is the Black--Scholes model, which assumes that the stock price follows a geometric Brownian motion with constant variance. While analytically tractable and elegant, the model has two well-known empirical failures. First, real return distributions exhibit leptokurtosis, with heavier tails than any normal distribution can accommodate. Second, implied volatilities extracted from observed option prices form a systematic skew or smile across strikes and maturities, rather than remaining flat as the model predicts. Both failures point in the same direction: actual price processes contain sudden, discontinuous moves that a continuous diffusion cannot generate.
+
+Merton (1976) was the first to formally address this by adding a Poisson-driven jump process to geometric Brownian motion. He modelled the total change in the stock price as the sum of an ordinary diffusive component, representing the gradual arrival of information, and an abnormal component, representing the sudden impact of firm-specific news. Formally, the stock price dynamics are
+\begin{equation}
+\frac{dS}{S} = (\alpha - \lambda k)\,dt + \sigma\,dZ + dq,
+\end{equation}
+where $\alpha$ is the instantaneous expected return, $\sigma^2$ is the diffusive variance conditional on no jump, $dZ$ is a standard Brownian motion, $q(t)$ is an independent Poisson process with arrival rate $\lambda$, and $k \equiv E(Y-1)$ is the expected percentage price change per jump, with $Y$ denoting the random jump size multiplier. To price options under these dynamics, Merton observed that a riskless hedging portfolio cannot be constructed when jumps are present, since jump risk cannot be perfectly replicated by any portfolio of the stock and a risk-free bond. Under the special case where $Y$ is lognormally distributed, assuming that jump risk is non-systematic and therefore unpriced, this yields the Merton pricing formula
+\begin{equation}
+F(S,\tau) = \sum_{n=0}^{\infty} \frac{e^{-\lambda\tau}(\lambda\tau)^n}{n!}\,W\!\left(S X_n e^{-\lambda k\tau},\,\tau;\,E,\,\sigma^2,\,r\right),
+\end{equation}
+where $W(\cdot)$ is the standard Black--Scholes formula, $\tau$ is the time to expiration, $E$ is the exercise price, $r$ is the risk-free rate, and $X_n$ captures the cumulative jump factor conditional on $n$ jumps. Intuitively, the formula is an infinite weighted average of Black--Scholes prices, one for each possible number of jumps, with Poisson probabilities as weights, and reduces to Black--Scholes when $\lambda = 0$.
+
+Despite its appeal, Merton's model has two notable limitations. Jump intensity $\lambda$ is constant, so the model cannot accommodate periods of elevated crash risk or jump clustering. Furthermore, normally distributed jump sizes imply symmetric tails, contradicting the well-documented finding that large negative equity returns are far more common than equally large positive returns.
+
+Kou (2002) addressed both shortcomings by replacing the normal jump size distribution with an asymmetric double-exponential distribution. The asset price dynamics are
+\begin{equation}
+\frac{dS(t)}{S(t^-)} = \mu\,dt + \sigma\,dW(t) + d\!\left(\sum_{i=1}^{N(t)}(V_i - 1)\right),
+\end{equation}
+where $W(t)$ is a standard Brownian motion, $N(t)$ is a Poisson process with rate $\lambda$, and $\{V_i\}$ are i.i.d.\ non-negative random variables such that $Y = \log V$ has the density
+\begin{equation}
+f_Y(y) = p\cdot\eta_1 e^{-\eta_1 y}\mathbf{1}_{\{y\geq 0\}} + q\cdot\eta_2 e^{\eta_2 y}\mathbf{1}_{\{y < 0\}},\quad \eta_1 > 1,\; \eta_2 > 0,
+\end{equation}
+where $p$ and $q = 1-p$ are the probabilities of upward and downward jumps, and $1/\eta_1$ and $1/\eta_2$ are their respective mean sizes. The asymmetry between $\eta_1$ and $\eta_2$ directly captures the observation that market crashes are typically sharper than market rallies, which is particularly relevant for a technology-heavy index like the Nasdaq-100.
+
+Beyond its empirical realism, the double-exponential distribution carries a significant mathematical advantage. Because exponential distributions are memoryless, the overshoot beyond a boundary also follows an exponential distribution and is conditionally independent of the first passage time. This structure enables closed-form solutions for path-dependent instruments --- barrier options, lookback options, and perpetual American options --- that are unavailable under Merton's normal jump specification. For European options, the pricing formula takes the form of a Poisson-weighted sum
+\begin{equation}
+f_n(S,\tau) = W\!\left(S,\,\tau;\,E,\,\sigma^2 + \frac{n\delta^2}{\tau},\,r\right),
+\end{equation}
+where $\delta^2$ is the variance of the logarithmic jump size and $f_n$ is the option price conditional on exactly $n$ jumps. Kou (2002) showed that the model reproduces the leptokurtic feature of daily returns and generates the asymmetric volatility skew observed in equity options, making it substantially more flexible than Merton's specification with a similarly parsimonious parameter set.
+
+A limitation shared by both models is that jump intensity $\lambda$ is constant. Carr and Wu (2003) approached this problem from a different angle: rather than proposing a new parametric model, they asked whether one can determine directly from observed option prices, without committing to any specific model, whether the underlying process contains a continuous component, a jump component, or both. The key insight is that the short-maturity behaviour of out-of-the-money (OTM) options is a sensitive diagnostic of the underlying process. Under a purely continuous diffusion, OTM option prices decay at the exponentially fast rate $O(e^{-c/T})$ for some constant $c > 0$. Under any process with a jump component, a single jump can bring an OTM option into the money at any moment, so prices decay only at the much slower rate $O(T)$. Carr and Wu formalised this through a decomposition of the time value of a European option,
+\begin{equation}
+TV_0(K,T) = e^{-rT}\int_0^T\!\left[\tfrac{1}{2}q(K,t)K^2\,E_0\!\left[\sigma_t^2\,\big|\,F_{t^-}=K\right] + E_0\!\left[F_{t^-}\,v^0_t(k)\right]\right]dt,
+\end{equation}
+showing how the continuous martingale component and the jump compensator each contribute to option prices. They then proposed plotting $\ln(P/T)$ against $\ln T$ --- a term decay plot --- and reading off the slope at short maturities. A flat slope near zero for OTM options signals a jump component; a sharply negative slope signals a pure diffusion; intermediate ATM slopes distinguish finite-variation from infinite-variation jump processes.
+
+Applying this methodology to S\&P 500 index options from April 1999 to May 2000, Carr and Wu found strong evidence for both a continuous and a jump component in index dynamics. The continuous component was persistently present throughout the sample, while the jump component varied substantially over time and was negatively correlated (around $-0.58$) with the level of implied volatility. This finding validates the general approach of Merton and Kou while simultaneously pointing to their most important limitation: they cannot accommodate the time-varying nature of jump intensity. For any empirical project working with index options, the Carr--Wu diagnostic therefore provides a model-free first check before any parametric calibration is attempted.
+
+\subsection*{Stochastic Volatility and Jump Clustering}
+
+While Merton and Kou represent genuine progress over Black--Scholes, both assume constant jump intensity, an assumption the evidence increasingly challenged. A natural baseline for richer dynamics is the stochastic volatility (SV) model of Heston (1993), in which the instantaneous variance $V_t$ follows a mean-reverting square-root process. Even this model falls short, as Eraker, Johannes, and Polson (2003) demonstrated through a careful likelihood-based study of S\&P 500 and Nasdaq 100 daily returns. The pure SV model still fails to generate the extreme returns observed during crises without implausibly large diffusive shocks; on the day of the October 1987 crash, it would require a return innovation of nearly eight standard deviations to produce the observed $-23\%$ move.
+
+The natural fix is to add return jumps, giving the SVJ model. In this specification the log-price $Y_t = \log S_t$ satisfies
+\begin{equation}
+dY_t = \mu\,dt + \sqrt{V_{t^-}}\,dW^Y_t + \xi^Y\,dN^Y_t,
+\end{equation}
+where $N^Y_t$ is a Poisson process with constant intensity $\lambda^Y$ and $\xi^Y \sim N(\mu_Y, \sigma_Y^2)$ is the normally distributed jump size. The variance process evolves as
+\begin{equation}
+dV_t = \kappa(\theta - V_t)\,dt + \sigma_v\sqrt{V_t}\,dW^V_t,
+\end{equation}
+with $\mathrm{Corr}(dW^Y_t, dW^V_t) = \rho\,dt$ capturing the leverage effect. Adding return jumps reduces the estimated diffusive volatility of volatility $\sigma_v$ and the speed of mean reversion $\kappa$, and jumps account for roughly 15\% of total return variance in the SVJ model.
+
+However, the SVJ model is itself misspecified in a revealing way. Under a constant-intensity Poisson assumption averaging roughly 1.5 arrivals per year, the SVJ algorithm identifies three separate jump arrivals during the week of the 1987 crash alone --- an implausible outcome under the model's own distributional assumptions. This clustering signals a systematic misfit: the model has no mechanism to link the occurrence of one jump to the likelihood of the next.
+
+The solution proposed by Eraker et al.\ is to allow volatility itself to jump. In the SVCJ model --- stochastic volatility with contemporaneous jumps --- the variance equation becomes
+\begin{equation}
+dV_t = \kappa(\theta - V_t)\,dt + \sigma_v\sqrt{V_{t^-}}\,dW^V_t + \xi^V\,dN_t,
+\end{equation}
+where $N_t$ is shared with the return-jump process, $\xi^V \sim \mathrm{Exp}(\mu_V)$ ensures positive volatility jumps, and the return jump conditional on the volatility jump is $\xi^Y \mid \xi^V \sim N(\mu_Y + \rho_J\xi^V, \sigma_Y^2)$. A volatility jump provides a persistent shock to the conditional distribution of future returns, whereas a return jump is transient: it shifts today's price but leaves tomorrow's variance unaffected. In the SVCJ model, the 1987 crash week is explained by a single large contemporaneous jump driving a $-14\%$ return while simultaneously pushing annualised volatility from around 40\% to just over 50\%, after which volatility mean-reverts gradually --- a far more economically coherent story than three independent Poisson arrivals in a single week.
+
+Estimation is carried out by Markov Chain Monte Carlo (MCMC), which recovers the full joint posterior of parameters and latent states --- spot volatility, jump times, and jump sizes --- simultaneously. Formal Bayes factors strongly favour the SVCJ specification: the log Bayes factor comparing the SV model to the SVIJ specification (independent jumps in returns and volatility) is 59.45, constituting decisive evidence in favour of the richer model by the Kass--Raftery scale. From an option-pricing perspective, volatility jumps steepen the implied volatility smile and generate the characteristic ``hook'' for in-the-money options, a feature entirely absent from the SVJ model.
+
+Despite these improvements, the SVCJ model still assumes constant jump intensities $\lambda^Y$ and $\lambda^V$, and the authors' own diagnostics undermine this assumption: jump times cluster in crisis periods, inconsistent with a homogeneous Poisson process. Hawkes (1971) self-exciting processes provide the natural mechanism for endogenising this behaviour. In a Hawkes process, the intensity $\lambda(t)$ increases each time a jump arrives and then decays back toward a baseline level:
+\begin{equation}
+\lambda(t) = \mu + \int_{-\infty}^{t}\varphi(t-s)\,dN(s),
+\end{equation}
+where $\mu > 0$ is the background intensity and $\varphi(\cdot) \geq 0$ is the excitation kernel, typically taken to be $\varphi(u) = \alpha e^{-\beta u}$ with $\alpha < \beta$ to ensure stationarity. Each jump raises $\lambda(t)$ by $\alpha$, making the next arrival more likely; but this excess intensity decays at rate $\beta$, so the process eventually returns to $\mu$. This structure captures both the clustering of jumps during market stress and their eventual dissipation. Calibration typically proceeds by maximum likelihood for moderate sample sizes or Sequential Monte Carlo (SMC) when jump sizes are also stochastic and the state space becomes high-dimensional. For the present project, the Hawkes framework serves primarily as a conceptual benchmark: the Merton and Kou models, with their constant $\lambda$, sit at one extreme of the spectrum, while the Hawkes model, with fully endogenous intensity, sits at the other.
+
+\subsection*{Machine Learning Extensions of Stochastic Processes}
+
+Both classical jump-diffusion models and richer stochastic volatility plus jump specifications produce analytical solutions only in special cases. Once one moves to genuinely incomplete markets --- where the number of independent risk sources exceeds the number of traded assets, which is the generic situation when multiple Brownian motions or Poisson processes are present --- closed-form hedging strategies cease to exist. This is precisely the setting studied by Agram, \O{}ksendal, and Rems (2024), who propose a deep learning approach to the minimal variance (quadratic) hedging problem.
+
+The market model considered is a single risky asset whose price $S(t)$ satisfies
+\begin{equation}
+dS(t) = S(t^-)\!\left[\alpha(t)\,dt + \sigma(t)\,dB(t) + \int_{\mathbb{R}^*}\!\gamma(t,\zeta)\,\tilde{N}(dt,d\zeta)\right],\quad S(0)>0,
+\end{equation}
+where $B(t)$ is an $m$-dimensional Brownian motion, $\tilde{N}$ is a $k$-dimensional compensated Poisson random measure, and $\alpha, \sigma, \gamma$ are deterministic and bounded. The market is incomplete when $m > 1$ or $k > 1$. For a self-financing portfolio $\pi(t)$ representing the fraction of wealth invested in the risky asset, the wealth process $X(t)$ evolves accordingly, and the hedging objective is to minimise
+\begin{equation}
+J(z,\pi) = E\!\left[\tfrac{1}{2}\bigl(X^{z,\pi}(T) - F\bigr)^2\right].
+\end{equation}
+Agram et al.\ frame this as a Stackelberg game: the first player chooses the initial endowment $z$ (the option price), and the second then selects the optimal portfolio $\hat{\pi}$ given that endowment. The main theoretical result is that the minimal variance price can be written as an expectation under a specific equivalent martingale measure $Q^*$:
+\begin{equation}
+\hat{z} = E^{Q^*}[F],
+\end{equation}
+where $Q^*$ is characterised by a Radon--Nikod\'{y}m derivative involving $G(t) = -\alpha(t)/\bigl(\sigma^2(t) + \int\gamma^2(t,\zeta)\,\nu(d\zeta)\bigr)$. Crucially, $Q^*$ is a genuine positive equivalent martingale measure rather than a signed measure, which is not guaranteed in general incomplete markets.
+
+In more complex settings, the price integral $E^{Q^*}[F]$ and the corresponding portfolio must be computed numerically. Agram et al.\ propose a neural network algorithm combining a feed-forward layer to estimate the option price $z_0$ with a two-layer Long Short-Term Memory (LSTM) network to approximate the optimal portfolio $\pi_t$ at each time step. The LSTM architecture is well suited to this problem: the optimal portfolio is adapted to the filtration generated by the price process, so past observations are relevant for each decision, and LSTM cells maintain a memory state that allows the network to learn how past jumps affect the current hedging ratio --- especially valuable when latent volatility evolves stochastically.
+
+The algorithm is tested on four model environments. In the Black--Scholes benchmark, it converges to the theoretical option price of 0.500 and recovers the delta hedge accurately. For the Merton jump-diffusion model, the minimal variance price is $\hat{z} = 0.519$, exceeding the Merton model's own price of 0.515. This difference arises because the Merton approach assumes jump risk is diversifiable and therefore receives no risk premium, whereas the minimal variance approach explicitly prices the unhedgeable component. The practical consequence is stark: standard Merton delta hedging produces a skewed distribution of hedging errors --- small gains most of the time but occasional large losses when a jump occurs --- whereas the minimal variance hedge yields a roughly symmetric error distribution with virtually no extreme losses. The algorithm also converges to a reasonable estimate for the Kou double-exponential model, where no closed-form equivalent martingale measure price exists.
+
+The main limitations concern scalability and interpretability: convergence slows after a few thousand training epochs, training time grows substantially with the number of time-discretisation steps, and accuracy decreases as option maturity lengthens due to accumulating discretisation errors. Despite these drawbacks, the framework represents a genuine advance over purely analytical methods because it handles models --- such as the Kou model with two-sided jumps, or future extensions incorporating stochastic volatility and self-exciting jump intensity --- where closed-form solutions simply do not exist.
+
+\subsection*{Research Frontier and Connection to Our Project}
+
+Taken together, the literature reviewed above traces a coherent arc from the first principled treatment of jump risk through to the modern machine learning frontier. Merton (1976) broke with the continuity assumption of Black--Scholes and provided the first tractable framework for option pricing under jump risk. Kou (2002) extended this by replacing the symmetric normal jump distribution with an asymmetric double-exponential, capturing the empirical reality that crashes are sharper than rallies and enabling closed-form solutions for a wider class of options. Carr and Wu (2003) confirmed empirically that both continuous and jump components are present in S\&P 500 index options, and that their relative importance varies systematically over time. Eraker, Johannes, and Polson (2003) demonstrated through Bayesian estimation that stochastic volatility alone is insufficient and that both return and volatility jumps are necessary to fit index data. The Hawkes framework provides one natural way to endogenise jump clustering, while the deep learning approach of Agram et al.\ (2024) addresses the pricing and hedging problem in incomplete markets where analytical solutions are unavailable.
+
+Several unresolved tensions emerge from this literature. The most fundamental is the trade-off between empirical richness and analytical tractability. The Merton and Kou models are estimable but too restrictive, unable to accommodate time-varying jump intensity or persistent volatility jumps. The SVCJ model fits the data better but requires computationally intensive MCMC estimation. The Hawkes framework adds endogenous clustering but raises its own estimation challenges and has not been as thoroughly tested against option-implied data as the parametric jump-diffusion models. The deep learning approach of Agram et al.\ is the most flexible but sacrifices interpretability.
+
+A second tension concerns the identification of jump risk premia. Both Merton and Kou price options without explicitly modelling the compensation that investors require for bearing jump risk. The finding that the minimal variance price exceeds the Merton price aligns with the expectation that implied volatilities should be systematically above the levels implied by the physical measure. For a technology index like the Nasdaq-100, where sector-specific crashes can be swift and severe, this premium is likely to be economically significant and is one of the central quantities of interest in the present project.
+
+A third consideration is the diagnostic value of the Carr--Wu term decay methodology. Before committing to any parametric model, plotting term decay curves for short-maturity options will indicate whether a finite-variation jump component of the Merton or Kou type is sufficient, or whether the data hints at infinite-variation or time-varying intensity dynamics. A flat OTM slope near zero at short maturities would confirm a Poisson-type jump component, while a clearly negative slope would point toward infinite-variation L\'{e}vy components or stochastic volatility extensions.
+
+Looking forward, the literature suggests several natural extensions. One is to replace the constant Poisson intensity in the Merton and Kou models with a Hawkes self-exciting intensity, capturing jump clustering during stress periods without the full computational burden of MCMC. Another is to apply the LSTM-based hedging algorithm of Agram et al.\ to produce out-of-sample hedging strategies for QQQ options that are more robust to jump risk than standard delta hedging. A third is to estimate the models jointly from time-series returns and option prices to obtain internally consistent estimates of both the physical and risk-neutral jump parameters. Each extension would move the analysis closer to the frontier of what the recent literature has demonstrated is both theoretically justified and empirically important.
+
+\paragraph{Literature Review Summary.}
+The literature reviewed in this chapter documents a clear progression in the understanding and modelling of discontinuous price dynamics. Black--Scholes fails on two empirically important counts: it cannot generate the heavy tails and negative skewness of real return distributions, and it produces a flat implied volatility surface rather than the skew or smile that options markets consistently display. Merton (1976) introduced a Poisson-driven jump process alongside the diffusion and derived an option pricing formula that nests Black--Scholes as a special case, but relies on symmetric normal jump sizes and a constant arrival rate. Kou (2002) improved on the first assumption by replacing the normal distribution with an asymmetric double-exponential, while both models leave jump intensity constant. Carr and Wu (2003) confirmed empirically that jumps are present in index options data and that their importance varies over time. Eraker, Johannes, and Polson (2003) showed through Bayesian estimation that stochastic volatility alone is insufficient, and that contemporaneous jumps in both returns and volatility are decisively preferred by the data. Hawkes processes extend this insight by formalising the endogenous clustering of jumps during market stress. Finally, the deep learning framework of Agram et al.\ (2024) provides a formal confirmation that jump risk commands a positive premium in incomplete markets, and that ignoring it leads to systematically biased hedges and unexpected losses.
+
+No single model explains financial markets perfectly: each involves a compromise between empirical fit, analytical tractability, and estimation feasibility. This honest recognition of limitations is precisely what motivates continued research into stochastic jump-diffusion processes and makes the study of jump risk premia in real option markets --- the focus of the present project --- both timely and relevant.
+\begin{thebibliography}{99}
+
+\bibitem[Merton(1976)]{Merton1976}
+Merton, R. C. (1976).
+Option pricing when underlying stock returns are discontinuous.
+
+\bibitem[Kou(2002)]{Kou2002}
+Kou, S. G. (2002).
+A jump-diffusion model for option pricing.
+
+\bibitem[Carr and Wu(2003)]{CarrWu2003}
+Carr, P., \& Wu, L. (2003).
+What type of process underlies options? A simple robust test.
+
+\bibitem[Eraker et~al.(2003)]{Eraker2003}
+Eraker, B., Johannes, M., \& Polson, N. (2003).
+The impact of jumps in volatility and returns.
+
+\bibitem[Gonzato and Sgarra(2020)]{Gonzato2020}
+Gonzato, L., \& Sgarra, C. (2020).
+Self-exciting jumps in the oil market: Bayesian estimation and dynamic hedging.
+
+\bibitem[Agram et~al.(2024)]{Agram2024}
+Agram, N., Øksendal, B., \& Rems, J. (2024).
+Deep learning for quadratic hedging in incomplete jump market.
+
+\end{thebibliography}
+
+\end{document}
