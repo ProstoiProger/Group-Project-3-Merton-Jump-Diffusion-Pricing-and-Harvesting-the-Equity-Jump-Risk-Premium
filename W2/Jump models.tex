@@ -360,6 +360,31 @@ where
 \end{equation}
 This formula is useful twice in our project. First, it provides a fast semi-closed-form benchmark for European option prices. Second, it will be used as a control variate and validation target for the Monte Carlo and COS implementations.
 
+\subsection*{Market Incompleteness}
+
+The Merton model is incomplete because jump risk cannot be perfectly replicated by continuously trading only the stock and the risk-free asset. The reason is simple but important.
+
+Suppose an option has value $C(t,S_t)$. If the stock jumps from $S_{t^-}$ to $S_{t^-}e^J$, then the option value jumps by
+\begin{equation}
+\Delta C_t=C(t,S_{t^-}e^J)-C(t,S_{t^-}).
+\label{eq:option_jump}
+\end{equation}
+A stock hedge holding $\Delta_t$ shares changes by
+\begin{equation}
+\Delta_t\Delta S_t=\Delta_t S_{t^-}(e^J-1).
+\label{eq:stock_jump_hedge}
+\end{equation}
+For perfect replication at the jump time, we would need
+\begin{equation}
+C(t,S_{t^-}e^J)-C(t,S_{t^-})
+=\Delta_tS_{t^-}(e^J-1)
+\quad\text{for every possible }J.
+\label{eq:jump_replication_condition}
+\end{equation}
+The right-hand side is linear in the jump multiplier $e^J$, while the option value is nonlinear in $S$. Except for a linear payoff, no single value of $\Delta_t$ can make Equation~\eqref{eq:jump_replication_condition} true for all possible jump sizes. Therefore the jump component creates unhedgeable risk.
+
+This has two consequences. First, unlike the Black--Scholes model, no-arbitrage alone does not determine a unique equivalent martingale measure. Second, delta hedging leaves jump-related hedging error, motivating the minimum-variance hedge and tail-risk analysis used later in the project. This is consistent with the standard link between market completeness, replication, and uniqueness of the risk-neutral measure discussed in continuous-time asset pricing theory \citep{Shreve2004}.
+
 \begin{thebibliography}{99}
 
 \bibitem[Merton(1976)]{Merton1976}
