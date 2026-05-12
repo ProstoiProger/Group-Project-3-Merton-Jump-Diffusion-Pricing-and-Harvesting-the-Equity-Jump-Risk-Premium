@@ -385,6 +385,60 @@ The right-hand side is linear in the jump multiplier $e^J$, while the option val
 
 This has two consequences. First, unlike the Black--Scholes model, no-arbitrage alone does not determine a unique equivalent martingale measure. Second, delta hedging leaves jump-related hedging error, motivating the minimum-variance hedge and tail-risk analysis used later in the project. This is consistent with the standard link between market completeness, replication, and uniqueness of the risk-neutral measure discussed in continuous-time asset pricing theory \citep{Shreve2004}.
 
+\subsection*{Kou Double-Exponential Jump Model}
+
+The Kou model keeps the same jump-diffusion structure but changes the distribution of the log-jump size. Instead of normal jumps, Kou assumes the asymmetric double-exponential density
+\begin{equation}
+f_J(j)=p\eta_1e^{-\eta_1 j}\mathbf{1}_{\{j\geq 0\}}
++q\eta_2e^{\eta_2 j}\mathbf{1}_{\{j<0\}},
+\quad p+q=1,
+\label{eq:kou_density}
+\end{equation}
+where $p$ is the probability of an upward jump and $q$ is the probability of a downward jump. The parameters $\eta_1$ and $\eta_2$ control the right and left tails. This asymmetry is useful for equity indices because downside jumps are usually sharper than upside jumps.
+
+The characteristic function of the Kou jump size is
+\begin{equation}
+\Psi_J^{\mathrm{Kou}}(u)
+=\frac{p\eta_1}{\eta_1-iu}
++\frac{q\eta_2}{\eta_2+iu}.
+\label{eq:kou_jump_cf}
+\end{equation}
+The compensator is
+\begin{equation}
+\kappa_{\mathrm{Kou}}
+=\mathbb{E}[e^J-1]
+=\frac{p\eta_1}{\eta_1-1}
++\frac{q\eta_2}{\eta_2+1}-1,
+\quad \eta_1>1.
+\label{eq:kou_kappa}
+\end{equation}
+Therefore the Kou log-price characteristic function is obtained by substituting Equations~\eqref{eq:kou_jump_cf} and~\eqref{eq:kou_kappa} into the general formula~\eqref{eq:general_cf}. This makes Kou directly compatible with the same Fourier/COS framework as Merton.
+
+The practical difference is that Merton uses normally distributed log-jumps, while Kou uses asymmetric exponential tails. Merton is simpler and gives a convenient Poisson-weighted Black--Scholes formula. Kou is better suited for modelling sharp downside moves and has special tractability for barrier and lookback options because the exponential distribution is memoryless.
+
+\subsection*{Parameter Interpretation}
+
+The parameters used in our Merton calibration have the following interpretation:
+\begin{center}
+\begin{tabular}{|c|p{6.5cm}|p{4.2cm}|}
+\hline
+Parameter & Financial meaning & Main effect on option surface \\
+\hline
+$\sigma$ & Continuous diffusive volatility & Controls the general level of implied volatility \\
+\hline
+$\lambda$ & Risk-neutral jump arrival intensity & Controls how much tail risk is priced \\
+\hline
+$\mu_J$ & Mean log-jump size & Controls the direction of skew; negative values generate downside skew \\
+\hline
+$\sigma_J$ & Standard deviation of log-jump size & Controls jump-size uncertainty and tail thickness \\
+\hline
+$\kappa$ & Expected percentage jump size, $\mathbb{E}[e^J-1]$ & Drift correction required for the martingale condition \\
+\hline
+\end{tabular}
+\end{center}
+
+This completes the theoretical input required by the later workstreams: the Monte Carlo engine uses the exact log-price representation, the COS engine uses the characteristic functions, the calibration step estimates the risk-neutral parameters from implied volatilities, and the hedging section uses incompleteness to motivate jump-aware hedging.
+
 \begin{thebibliography}{99}
 
 \bibitem[Merton(1976)]{Merton1976}
