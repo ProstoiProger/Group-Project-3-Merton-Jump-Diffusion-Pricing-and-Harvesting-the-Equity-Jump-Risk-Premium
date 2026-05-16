@@ -9,7 +9,6 @@ OUTPUTS = Path("outputs")
 DATA_RAW.mkdir(parents=True, exist_ok=True)
 OUTPUTS.mkdir(parents=True, exist_ok=True)
 
-
 def download_qqq_daily(period="3y"):
     qqq = yf.download("QQQ", period=period, interval="1d")
     qqq["returns"] = np.log(qqq["Close"] / qqq["Close"].shift(1))
@@ -86,4 +85,3 @@ plt.legend()
 plt.grid(True)
 plt.savefig("outputs/detected_jumps.png")
 plt.show()
-
