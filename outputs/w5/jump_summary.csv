@@ -1,7 +1,8 @@
 metric,value
-total_days,752.0
-jump_days,32.0
-jump_frequency,0.0425531914893617
-avg_jump_size_proxy,0.03460026664212145
-median_jump_size_proxy,0.0294228385295664
-max_jump_size_proxy,0.1133561607392816
+total_days,714.0
+jump_days,80.0
+jump_frequency,0.11204481792717087
+annualized_jump_rate,28.23529411764706
+avg_jump_size_proxy,0.013119096797527896
+median_jump_size_proxy,0.00855504828908835
+max_jump_size_proxy,0.1133562923499975

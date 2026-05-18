@@ -19,6 +19,12 @@ def download_qqq_daily(period="3y"):
         progress=False
     )
 
+    if isinstance(qqq.columns, pd.MultiIndex):
+        qqq.columns = [
+            col[0] if isinstance(col, tuple) else col
+            for col in qqq.columns
+        ]
+
     qqq = qqq.reset_index()
     qqq["returns"] = np.log(qqq["Close"] / qqq["Close"].shift(1))
     qqq = qqq.dropna().copy()
