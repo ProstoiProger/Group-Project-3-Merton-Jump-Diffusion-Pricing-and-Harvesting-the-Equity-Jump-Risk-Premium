@@ -1,9 +1,6 @@
 # Environment and secrets
 .env
 
-# Output artefacts (CSVs and PDFs produced by the pipeline)
-results/
-
 # Python
 __pycache__/
 *.py[cod]
