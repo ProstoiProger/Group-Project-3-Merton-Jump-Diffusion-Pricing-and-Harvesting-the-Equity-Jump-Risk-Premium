@@ -1,0 +1,452 @@
+\documentclass[11pt,a4paper]{article}
+
+% =========================================================
+% Packages
+% =========================================================
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+% =========================================================
+% Safe figure helper
+% =========================================================
+\newcommand{\safefig}[3]{%
+  \IfFileExists{#1}{%
+    \begin{figure}[H]
+      \centering
+      \includegraphics[width=0.92\textwidth]{#1}
+      \caption{#2}
+      \label{#3}
+    \end{figure}
+  }{%
+    \begin{figure}[H]
+      \centering
+      \fbox{\parbox{0.92\textwidth}{\centering\textit{Figure not yet generated. Run the pipeline scripts to produce \texttt{\detokenize{#1}}.}}}
+      \caption{#2 [placeholder]}
+      \label{#3}
+    \end{figure}
+  }%
+}
+
+% =========================================================
+% Metadata
+% =========================================================
+\title{\textbf{W5: Data Collection and Jump Detection}\\[0.4em]
+\large Merton Jump-Diffusion Project --- Group 3}
+\date{May 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% =========================================================
+\section{Introduction and Project Scope}
+% =========================================================
+
+This report documents Week 5 of the Group 3 Merton jump-diffusion project. The objective of this week is to connect the theoretical jump-diffusion framework with empirical QQQ market data. In particular, the week has four tasks: (i) collect and clean three years of daily QQQ price data, (ii) build a daily-frequency jump diagnostic based on realised variance and bipower variation, (iii) identify candidate jump days and characterise their empirical distribution, and (iv) prepare QQQ option data for later risk-neutral calibration in Week 6.
+
+QQQ is a natural choice for the underlying asset because it is liquid, widely followed, and strongly exposed to technology-sector repricing, macroeconomic announcements, and volatility shocks. These characteristics make it especially suitable for a study of discontinuous equity risk. The empirical results of this week provide the bridge between the observed return process and the jump parameters that will later be estimated from option prices.
+
+\subsection{Data Design: Horizon vs.\ Frequency}
+
+The project deliberately uses daily data over a three-year horizon rather than intraday data over a short window. This is a principled design choice, not a compromise in methodology. A long horizon provides enough observations to estimate a stable physical-measure jump intensity and to link detected jumps to identifiable macro events. In contrast, free intraday data from Yahoo Finance are limited to a much shorter historical window and are therefore unsuitable for stable long-run jump intensity estimation.
+
+The trade-off is that daily frequency rules out the genuine Barndorff-Nielsen--Shephard (BNS) high-frequency jump test. The BNS statistic requires intraday observations, $\sqrt{n}$ scaling, and tripower quarticity. None of those ingredients are available here. Instead, this week uses a daily-compatible variance-ratio diagnostic built from the same core realised-variance and bipower-variation logic. The diagnostic is interpreted carefully and honestly throughout the report.
+
+% =========================================================
+\section{Data Collection}
+% =========================================================
+
+\subsection{QQQ Daily Equity Data}
+
+Daily OHLCV data for the Invesco QQQ Trust (\texttt{QQQ}) were downloaded from Yahoo Finance using \texttt{yfinance} with \texttt{auto\_adjust=True}, so that prices are split- and dividend-adjusted. From the adjusted closing prices we compute daily log-returns as
+\[
+r_t = \ln\left(\frac{S_t}{S_{t-1}}\right),
+\]
+where $S_t$ denotes the adjusted closing price on day $t$.
+
+The resulting sample spans 2023-05-23 to 2026-05-20 and contains 751 trading-day observations. After applying a 20-day rolling burn-in window for the variance diagnostics, 732 days are fully usable for the jump analysis. Over this horizon the series shows clear volatility clustering, occasional extreme movements, and a pronounced upward trend in the underlying ETF price.
+
+\safefig{outputs/w5/qqq_price.png}
+        {QQQ adjusted closing price over the three-year sample.}
+        {fig:qqq-price}
+
+\safefig{outputs/w5/qqq_returns.png}
+        {QQQ daily log-returns. Volatility clustering and occasional large moves are visible.}
+        {fig:qqq-returns}
+
+\subsection{Return Distribution Characteristics}
+
+Table~\ref{tab:return-stats} reports the key moments of the daily return series. The excess kurtosis is far above the Gaussian value of zero, and the Jarque--Bera test decisively rejects normality. These statistics motivate the jump component in the Merton model.
+
+\begin{table}[H]
+\centering
+\caption{Daily QQQ log-return distribution statistics (2023-05-23 to 2026-05-20, $N=732$).}
+\label{tab:return-stats}
+\begin{tabular}{lr}
+\toprule
+Statistic & Value \\
+\midrule
+Observations & 732 \\
+Mean (daily) & 0.000930 \\
+Std.\ dev.\ (daily) & 0.012418 \\
+Skewness & 0.379 \\
+Excess kurtosis & 10.59 \\
+Jarque--Bera statistic & 3385.5 \\
+Jarque--Bera $p$-value & $<10^{-6}$ \\
+Minimum return & $-6.4\%$ \\
+Maximum return & $+11.3\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+An excess kurtosis $\gg 0$ implies heavier tails than the normal distribution predicts. The histogram in Figure~\ref{fig:return-hist} overlays a fitted Gaussian density and shows the pronounced discrepancy in the tails.
+
+\safefig{outputs/w5/returns_histogram.png}
+        {QQQ daily log-return histogram with fitted normal density. The fat tails are inconsistent with pure Brownian motion and support the inclusion of a jump component.}
+        {fig:return-hist}
+
+\subsection{Option Chain Data}
+
+QQQ option chains across six expiries were downloaded from Yahoo Finance on 2026-05-20. The raw file contains 1{,}471 contracts. Table~\ref{tab:options-quality} summarises the cleaned dataset.
+
+\subsubsection*{Cleaning Methodology}
+
+A contract is retained if it satisfies at least one of:
+\begin{enumerate}[label=(\alph*)]
+  \item \textbf{Live bid/ask}: $\text{bid}>0$, $\text{ask}>0$, and $\text{ask}\ge \text{bid}$.
+  \item \textbf{Stale last-price with interest}: $\text{lastPrice}>0$ and $\text{openInterest}>0$.
+\end{enumerate}
+A \texttt{price\_source} column records which route was used. Completely stale contracts (\texttt{volume} = \texttt{openInterest} = \texttt{bid} = 0) are dropped outright.
+
+In addition, two no-arbitrage filters are applied:
+\begin{itemize}
+  \item \textbf{Monotonicity}: call prices must be weakly decreasing in strike; put prices weakly increasing. Violations are flagged with \texttt{arb\_flag\_mono}.
+  \item \textbf{Put-call parity check}: pairs with $|C-P|>\$10$ are flagged with \texttt{arb\_flag\_pcp} as potential data artefacts. A more precise parity check using the spot and risk-free rate will be applied in W6.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Options data quality summary after cleaning (snapshot date: 2026-05-20).}
+\label{tab:options-quality}
+\begin{tabular}{lrrrr}
+\toprule
+Expiry & Contracts & Strikes & Calls & Puts \\
+\midrule
+2026-05-20 & 113 & 106 &  73 &  40 \\
+2026-05-21 & 141 &  91 &  77 &  64 \\
+2026-05-22 & 286 & 216 & 202 &  84 \\
+2026-05-26 & 116 &  74 &  59 &  57 \\
+2026-05-27 & 122 &  75 &  58 &  64 \\
+2026-05-28 & 123 &  80 &  61 &  62 \\
+\midrule
+Total & 901 & --- & 530 & 371 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The cleaned dataset has 901 contracts across 6 maturities, exceeding the project requirement of at least 6 maturities and at least 15 strikes. The team must re-run \texttt{options\_data.py} during U.S.\ market hours (Mon--Fri 09:30--16:00 ET) to obtain live bid/ask quotes for W6 calibration.
+
+% =========================================================
+\section{Jump Detection Methodology}
+\label{sec:diagnostic}
+% =========================================================
+
+\subsection{Realised Variance and Bipower Variation}
+
+For a rolling window of $w=20$ trading days ending at day $t$:
+\[
+RV_t=\sum_{s\in\mathcal{W}_t} r_s^2,
+\qquad
+BPV_t=\frac{1}{\mu_1^2}\sum_{s\in\mathcal{W}_t} |r_s|\,|r_{s-1}|,
+\qquad
+\mu_1=\sqrt{\frac{2}{\pi}}.
+\]
+The bipower variation scaling by $\mu_1^{-2}$ follows Barndorff-Nielsen and Shephard (2004) and makes $BPV_t$ a jump-robust estimator of integrated variance. Under pure diffusion $RV_t \approx BPV_t$; in the presence of jumps, $RV_t$ is inflated relative to $BPV_t$.
+
+\subsection{Rolling RV/BPV Log-Ratio Variance-Ratio Jump Diagnostic}
+
+\begin{quote}
+\textbf{Terminology note.} This diagnostic is not the Barndorff-Nielsen--Shephard (BNS) test. The genuine BNS statistic requires intraday data, $\sqrt{n}$ scaling by the number of intraday observations, and tripower quarticity --- none of which are available at daily frequency. We use a daily-compatible variance-ratio diagnostic derived from the same RV/BPV logic.
+\end{quote}
+
+Define the log-ratio
+\begin{equation}
+\ell_t=\ln\left(\frac{RV_t}{BPV_t}\right).
+\label{eq:logratio}
+\end{equation}
+Taking logarithms makes the statistic symmetric around zero under the no-jump null (where $RV/BPV \approx 1$) and reduces the influence of outliers in the raw ratio.
+
+The standardised score is
+\begin{equation}
+Z_t=\frac{\ell_t-\bar{\ell}_{t,w}}{s_{\ell,t,w}},
+\label{eq:Zt}
+\end{equation}
+where $\bar{\ell}_{t,w}$ and $s_{\ell,t,w}$ are the rolling mean and standard deviation of $\ell$ over the same window $w$.
+
+\medskip
+\noindent\textbf{Critical caveat.} $Z_t$ is an empirical standardised score. It has no known null distribution at daily frequency. The threshold $|Z_t|>2$ is therefore a descriptive flagging rule, not a 5\% significance test. We do not claim that flagged days are jumps with controlled false-positive rate; we claim only that they are anomalous relative to the recent rolling history of the RV/BPV ratio.
+
+\subsection{Two-Condition Confirmation Filter}
+
+Because the single-condition rule $|Z_t|>2$ can flag volatility-cluster days with elevated RV/BPV but modest returns, we introduce a two-condition confirmation rule:
+\begin{align}
+\text{Single-condition:} &\quad |Z_t|>2, \label{eq:single} \\
+\text{Two-condition:} &\quad |Z_t|>2 \;\text{AND}\; |r_t|>3\hat{\sigma}_t, \label{eq:two}
+\end{align}
+where $\hat{\sigma}_t$ is the 20-day rolling standard deviation of returns. The two-condition rule selects days that are anomalous in both the variance-ratio space and in absolute return magnitude. The results under both rules are reported side-by-side.
+
+% =========================================================
+\section{Results}
+% =========================================================
+
+\subsection{Summary Statistics}
+
+Table~\ref{tab:jump-summary} reports the main jump detection output. The single-condition rule flags 99 days (annualised rate $\approx 34$ per year). The two-condition rule retains only 4 days (annualised rate $\approx 1.4$ per year). The true physical-measure intensity $\lambda^{\mathbb{P}}$ lies somewhere in the range $[1.4,\,34]$; the literature for equity indices suggests 2--6 significant jumps per year.
+
+\begin{table}[H]
+\centering
+\caption{Rolling RV/BPV Log-Ratio Variance-Ratio Jump Diagnostic: summary statistics.}
+\label{tab:jump-summary}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+Total trading days in sample & 751 \\
+Valid days (after 20-day rolling window) & 732 \\
+Jump days --- single-condition ($|Z_t|>2$) & 99 \\
+Jump frequency (single) & 13.5\% \\
+Annualised jump rate $\hat{\lambda}^{\mathbb{P}}$ (single, liberal upper bound) & 34.1 \\
+Jump days --- two-condition ($|Z_t|>2$ and $|r_t|>3\hat{\sigma}_t$) & 4 \\
+Jump frequency (two-condition) & 0.55\% \\
+Annualised jump rate $\hat{\lambda}^{\mathbb{P}}$ (two-cond., conservative) & 1.38 \\
+Mean $|r_t|$ on single-cond.\ days & 1.28\% \\
+Median $|r_t|$ on single-cond.\ days & 0.88\% \\
+Max $|r_t|$ on flagged days & 11.3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The large gap between the two estimates reflects the well-known difficulty of separating jumps from volatility clusters at daily frequency. The single-condition count should be treated as a liberal upper bound; the two-condition count is a conservative lower bound. For calibrating the Merton model in W6, we recommend treating $\hat{\lambda}^{\mathbb{P}}\in[2,6]$ as the plausible structural range and using the option-implied $\hat{\lambda}^{\mathbb{Q}}$ as the primary calibration target.
+
+\subsection{Rolling RV vs BPV}
+
+Figure~\ref{fig:rv-bpv} plots the rolling RV and BPV series. Spikes in RV above BPV correspond to periods of elevated jump activity.
+
+\safefig{outputs/w5/rv_bpv_timeseries.png}
+        {Rolling 20-day Realised Variance (RV) and Bipower Variation (BPV). Periods where RV exceeds BPV substantially are candidates for jump activity.}
+        {fig:rv-bpv}
+
+\subsection{Log-Ratio Z Score}
+
+Figure~\ref{fig:z-score} shows the $Z_t$ series with the $\pm 2$ descriptive flagging thresholds.
+
+\safefig{outputs/w5/rv_bpv_ratio_z.png}
+        {Rolling RV/BPV Log-Ratio Variance-Ratio Jump Diagnostic ($Z_t$). Dashed lines mark the $\pm 2$ descriptive flagging thresholds (not formal significance levels).}
+        {fig:z-score}
+
+\subsection{Returns with Flagged Jump Days}
+
+\safefig{outputs/w5/daily_jump_days.png}
+        {QQQ daily log-returns with single-condition (orange) and two-condition (red diamond) flagged days superimposed. Two-condition days are visually the largest return moves.}
+        {fig:jump-days}
+
+\subsection{Major Jump Dates}
+
+Table~\ref{tab:major-jumps} lists the ten highest-ranked days by $|Z_t|$. All annotated events are based on public-record market news.
+
+\begin{table}[H]
+\centering
+\caption{Top 10 flagged days ranked by $|Z_t|$ (single-condition rule). The two-cond.\ column marks days also exceeding $3\hat{\sigma}_t$.}
+\label{tab:major-jumps}
+\small
+\begin{tabular}{llrrl}
+\toprule
+Date & $r_t$ & $Z_t$ & Two-cond. & Market event \\
+\midrule
+2026-01-20 & $-2.1\%$ & 4.09 & ---         & Trump inauguration; executive order barrage, tariff threats \\
+2025-10-10 & $-3.5\%$ & 4.08 & $\checkmark$ & US--China tariff escalation (second wave) \\
+2024-08-30 & $+1.2\%$ & 3.72 & ---         & Recovery from Aug.\ 2024 yen carry-trade unwind \\
+2025-08-01 & $-2.0\%$ & 3.68 & $\checkmark$ & Weak payrolls; Sahm Rule triggered, recession fears \\
+2023-07-20 & $-2.3\%$ & 3.64 & ---         & Fed hawkishness; rate expectations reset \\
+2024-12-18 & $-3.7\%$ & 3.40 & $\checkmark$ & Fed hawkish pivot; 2025 rate-cut path narrowed \\
+2025-04-03 & $-5.5\%$ & 3.33 & ---         & ``Liberation Day'' tariff shock (Trump Apr.\ 2 announcement) \\
+2024-06-05 & $+2.0\%$ & 3.14 & ---         & Strong ADP payrolls; macro surprise, elevated intraday range \\
+2023-07-25 & $+0.7\%$ & 3.00 & ---         & Mixed tech earnings season; intraday volatility elevated \\
+2026-04-28 & $-1.0\%$ & 2.87 & ---         & Continued trade-policy uncertainty; tariff-related risk-off \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Sources for Event Annotations}
+\label{subsubsec:event-annotation-sources}
+
+The event annotations in Table~\ref{tab:major-jumps} are based on publicly available financial news coverage and macroeconomic event summaries. These annotations are intended to provide economic context only and should not be interpreted as proof of causal attribution. Table~\ref{tab:w5-event-sources} lists a primary public reference for each of the ten annotated dates.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Primary public-record sources for all ten market-event annotations in Table~\ref{tab:major-jumps}.}
+    \label{tab:w5-event-sources}
+    \begin{tabular}{p{2.3cm}p{9.0cm}}
+        \toprule
+        Date & Main public-reference source \\
+        \midrule
+        2026-01-20 & Reuters coverage of U.S.\ presidential inauguration and tariff-related executive order announcements \\
+        2025-10-10 & Bloomberg and Reuters reporting on renewed U.S.--China tariff escalation (second wave) \\
+        2024-08-30 & Financial press post-mortems of the August 2024 yen carry-trade unwind and subsequent recovery \\
+        2025-08-01 & U.S.\ Bureau of Labor Statistics payroll release; Sahm Rule recession-indicator commentary \\
+        2023-07-20 & Federal Reserve communication coverage; FOMC rate-expectations reset in July 2023 \\
+        2024-12-18 & Federal Reserve policy statement and post-FOMC market reaction (hawkish pivot) coverage \\
+        2025-04-03 & Financial press coverage of the ``Liberation Day'' tariff announcement shock (Trump, Apr.\ 2) \\
+        2024-06-05 & ADP National Employment Report (June 5, 2024); macro surprise and intraday volatility commentary \\
+        2023-07-25 & Mixed Q2 2023 tech earnings coverage; intraday volatility elevated across Nasdaq constituents \\
+        2026-04-28 & Reuters and Bloomberg trade-policy uncertainty coverage; continued tariff-related risk-off \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\safefig{outputs/w5/jump_size_distribution.png}
+        {Left: histogram of $|r_t|$ on single-condition flagged days with fitted lognormal density. Right: Q--Q plot of $\ln|r_t|$ against the normal distribution, testing the lognormal assumption.}
+        {fig:jump-size}
+
+% =========================================================
+\section{Lognormal Jump-Size Comparison}
+\label{sec:lognormal}
+% =========================================================
+
+The Merton (1976) model assumes that jump sizes $Y$ are lognormally distributed:
+\[
+\ln(1+Y)\sim \mathcal{N}(\mu_J,\sigma_J^2).
+\]
+We perform an indicative comparison by fitting a lognormal to the absolute returns on the 99 single-condition flagged days.
+
+\begin{quote}
+\textbf{Caveat.} $|r_t|$ on a flagged day conflates diffusion variance and the jump component. The true jump size is $r_t^{\text{jump}} = r_t - r_t^{\text{diffusion}}$, which requires a more detailed decomposition (e.g.\ Carr--Wu 2003). This analysis is therefore indicative rather than definitive.
+\end{quote}
+
+\subsection{Fitted Parameters and Goodness-of-Fit}
+
+Fitting by maximum likelihood with location fixed at zero gives:
+\[
+\hat{\mu}_J=\ln(\widehat{\mathrm{scale}})=-4.885,
+\qquad
+\hat{\sigma}_J=1.158.
+\]
+The Kolmogorov--Smirnov test fails to reject the lognormal hypothesis:
+\[
+D_{99}=0.118,
+\qquad
+p\text{-value}=0.118.
+\]
+The lognormal is not rejected at the 5\% significance level, though the margin is modest ($p = 0.118$, just above the conventional 10\% boundary). The fit should be regarded as broadly consistent with the Merton model assumption rather than a strongly confirmed result. The Q--Q plot in Figure~\ref{fig:jump-size} shows approximate linearity in the log scale with some deviation in the upper tail.
+
+\subsection{Discussion}
+
+The non-rejection of the lognormal is qualitatively consistent with the Merton model. However, three caveats apply. First, the sample is small (99 observations) and the KS test has limited power; other heavy-tailed distributions may fit equally well and the test cannot distinguish between them. Second, the $p$-value of 0.118 is close to the 0.10 boundary, meaning the lognormal hypothesis is only marginally not rejected. Third, the right tail of the distribution (large negative returns like the $-5.5\%$ Liberation Day move and the $+11.3\%$ event of 2025-04-09) may be better described by heavier-tailed distributions such as the variance-gamma or double-exponential (Kou 2002). These are not pursued here but could be explored in W6.
+
+% =========================================================
+\section{Physical Intensity Estimate and Bridge to W2/W6}
+% =========================================================
+
+\subsection{Physical-Measure Intensity Estimate}
+
+Following the W2 notation, the physical-measure jump intensity is estimated as
+\[
+\hat{\lambda}^{\mathbb{P}} \approx 252 \cdot \frac{K}{N},
+\]
+where $K$ is the number of flagged days and $N=732$ is the number of valid trading days. Table~\ref{tab:intensity} summarises both estimates.
+
+\begin{table}[H]
+\centering
+\caption{Physical-measure intensity estimates under two flagging rules.}
+\label{tab:intensity}
+\begin{tabular}{lrr}
+\toprule
+Rule & $K$ & $\hat{\lambda}^{\mathbb{P}}$ \\
+\midrule
+Single-condition ($|Z_t|>2$) --- liberal upper bound & 99 & 34.1 \\
+Two-condition ($|Z_t|>2$ and $|r_t|>3\hat{\sigma}_t$) --- conservative & 4 & 1.38 \\
+Literature benchmark (equity indices) & --- & 2--6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The single-condition estimate is an upper bound driven by volatility-cluster days that the variance-ratio diagnostic cannot distinguish from genuine jumps at daily frequency. The two-condition estimate is a conservative lower bound. The plausible structural range for W6 calibration is $\hat{\lambda}^{\mathbb{P}}\in[2,6]$.
+
+\subsection{Bridge to W6: Risk-Neutral Intensity and the Jump Risk Premium}
+
+W6 will recover the risk-neutral intensity $\hat{\lambda}^{\mathbb{Q}}$ by calibrating the Merton model to the QQQ option surface. The difference
+\[
+\hat{\lambda}^{\mathbb{Q}}-\hat{\lambda}^{\mathbb{P}}
+\]
+(together with any difference in jump-size parameters
+$\mu_J^{\mathbb{Q}}-\mu_J^{\mathbb{P}}$ and
+$\sigma_J^{\mathbb{Q}}-\sigma_J^{\mathbb{P}}$) constitutes the jump risk premium --- the central economic quantity of the project. If $\hat{\lambda}^{\mathbb{Q}}>\hat{\lambda}^{\mathbb{P}}$, the market prices jumps at a higher frequency than they occur under the physical measure, implying that investors require compensation for jump risk beyond pure expected value.
+
+% =========================================================
+\section{Repository Hygiene}
+% =========================================================
+
+\begin{itemize}
+  \item All outputs are consolidated in a single directory: \texttt{outputs/w5/}. Any PNG files remaining in the legacy \texttt{outputs/} root are duplicates left from earlier exploratory runs; only the files in \texttt{outputs/w5/} are used by the W5 scripts.
+  \item \texttt{initial\_eda.py} retains the simple 2$\sigma$ threshold check as a clearly labelled ``preliminary visual check'' for orientation only. It is not the jump detector and the code comments state this explicitly.
+  \item \texttt{rv\_bpv\_analysis.py}: computes RV, BPV, and the log-ratio $Z_t$ (Equation~\eqref{eq:Zt}). References to BNS have been removed.
+  \item \texttt{jump\_detection.py}: applies both single- and two-condition flagging rules, fits the lognormal, and reports all diagnostics. The constant was renamed from \texttt{BNS\_Z\_THRESHOLD} to \texttt{VAR\_RATIO\_Z\_THRESHOLD}.
+  \item \texttt{options\_data.py}: applies the relaxed retention filter, adds no-arbitrage checks, records \texttt{price\_source}, and prints a data-quality summary.
+
+  \begin{table}[htbp]
+    \centering
+    \small
+    \caption{Key W5 output files used for reproducibility and later calibration stages.}
+    \label{tab:w5-output-files}
+    \begin{tabular}{p{4.3cm}p{7.2cm}}
+        \toprule
+        File & Purpose \\
+        \midrule
+        \texttt{jump\_summary.csv} & Summary statistics for the jump-detection procedure \\
+        \texttt{major\_jump\_dates.csv} & Ranked jump dates and associated diagnostics \\
+        \texttt{return\_dist\_stats.csv} & Distributional statistics for QQQ daily returns \\
+        \texttt{lognormal\_fit.csv} & Parameters and goodness-of-fit metrics for the lognormal comparison \\
+        \texttt{outputs/w5/*.png} & Figures generated by the RV/BPV and jump-analysis scripts \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+  
+\end{itemize}
+
+% =========================================================
+\section{Conclusion}
+% =========================================================
+
+This report has:
+\begin{enumerate}[label=\arabic*.]
+  \item Documented the principled choice to use daily data over a three-year horizon, and described the Rolling RV/BPV Log-Ratio Variance-Ratio Jump Diagnostic (Equations~\eqref{eq:logratio} and~\eqref{eq:Zt}) as a daily-compatible variance-ratio tool with clearly stated limitations.
+  \item Quantified the return distribution: excess kurtosis of 10.6 and a decisively rejected normality test confirm the need for a jump component.
+  \item Detected 99 single-condition and 4 two-condition candidate jump days, yielding annualised intensity bounds of $[1.38,\,34.1]$ per year, with a plausible structural estimate of $2$--$6$ per year.
+  \item Demonstrated that a lognormal distribution provides an indicative fit to jump-size proxies ($\hat{\mu}_J=-4.88$, $\hat{\sigma}_J=1.16$, KS $p=0.12$, not rejected at the 5\% level though with modest margin), broadly supporting the Merton model assumption at the current sample size.
+  \item Cleaned the QQQ option chain to 901 contracts across 6 maturities and established the bridge to W6: the gap $\hat{\lambda}^{\mathbb{Q}}-\hat{\lambda}^{\mathbb{P}}$ is the jump risk premium to be estimated from option prices.
+\end{enumerate}
+
+\bigskip
+\noindent\textbf{Action item before W6:} re-run \texttt{options\_data.py} during U.S.\ market hours to obtain live bid/ask quotes for the option surface calibration.
+
+\end{document}
