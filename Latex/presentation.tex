@@ -22,12 +22,11 @@
 \setbeamerfont{block body}{size=\footnotesize}
 
 
-\setbeamertemplate{navigation symbols}{}
 
+\setbeamertemplate{navigation symbols}{}
 
 \setlength{\itemsep}{1pt}
 \setlength{\parskip}{1pt}
-
 
 \setbeamertemplate{footline}{%
   \leavevmode%
@@ -45,14 +44,13 @@
   \vskip0pt%
 }
 
-
 \usepackage{amsmath,amssymb}
+\usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,backgrounds}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-
 
 \title[Jump-Diffusion: Pricing \& Jump Risk Premium]{%
   Merton Jump-Diffusion:\\[2pt]
@@ -61,10 +59,7 @@
 \author[Group 3]{Group 3}
 \date{May 2026}
 
-
 \begin{document}
-
-
 
 {
 \setbeamertemplate{footline}{}
@@ -73,14 +68,11 @@
 \end{frame}
 }
 
-
 \begin{frame}{Outline}
 \tableofcontents[sectionstyle=show,subsectionstyle=hide]
 \end{frame}
 
-
 \section{Overview \& Motivation}
-
 
 \begin{frame}{Why Go Beyond Black--Scholes?}
 \begin{columns}[T]
@@ -112,9 +104,7 @@ Agram et al.\ (2024) & Deep-learning hedge \\
 \end{columns}
 \end{frame}
 
-
 \section{Literature Review I: Classical Jump-Diffusion Models}
-
 
 \begin{frame}{Merton (1976): The First Jump-Diffusion Model}
 \begin{columns}[T]
@@ -241,9 +231,7 @@ Combined (CJ)          & $O(T)$ \\
 \end{columns}
 \end{frame}
 
-
 \section{Literature Review II: Stochastic Volatility \& Jump Clustering}
-
 
 \begin{frame}{Eraker, Johannes \& Polson (2003): Jumps in Volatility}
 \begin{columns}[T]
@@ -326,9 +314,7 @@ Hawkes: after a shock, further extreme moves are \textbf{more likely} for days/w
 \end{columns}
 \end{frame}
 
-
 \section{Literature Review III: Deep Learning for Incomplete Markets}
-
 
 \begin{frame}{Agram, \O{}ksendal \& Rems (2024): Deep Learning Hedge}
 \begin{columns}[T]
@@ -374,7 +360,6 @@ Kou & 0.499 & --- \\
 \end{frame}
 
 \section{Mathematical Derivations}
-
 
 \begin{frame}{Merton SDE: From Physical to Risk-Neutral Measure}
 \begin{columns}[T]
@@ -436,9 +421,7 @@ Plugs directly into $\phi_X$ $\Rightarrow$ COS engine unchanged.
 \end{columns}
 \end{frame}
 
-
 \section{Monte Carlo Pricing \& Validation}
-
 
 \begin{frame}{Monte Carlo Engine: Simulation \& Variance Reduction}
 \begin{columns}[T]
@@ -474,100 +457,26 @@ X_T = X_0 + \nu T + \sigma W_T + \sum_{i=1}^{N_T} J_i
 \end{columns}
 \end{frame}
 
-
 \section{COS Pricing Engine}
 
-
-\begin{frame}{COS Method: Spectral Convergence}
-\begin{columns}[T]
-\column{0.50\textwidth}
-{\small\textbf{Fang \& Oosterlee (2008) formula:}}
-\[
-C_0 = e^{-rT}\sum_{k=0}^{N-1}{}' \,
-\Re\!\bigl[\phi(u_k)\,e^{-iu_k a}\bigr]\,U_k
-\]
-{\footnotesize $U_k = \frac{2}{b-a}\bigl[\chi_k(c,b) - K\,\psi_k(c,b)\bigr]$}
-
-\smallskip
-{\footnotesize Helper integrals $\chi_k$, $\psi_k$ computed in closed form. Truncation: $a = \kappa_1 - L\sqrt{\kappa_2+\sqrt{|\kappa_4|}}$, $L=10$.}
-
-\column{0.50\textwidth}
-\begin{block}{Spectral convergence}
-\footnotesize
-\begin{tabular}{rc}
-\toprule
-$N$ & $|C^{\text{COS}}-C^{\text{exact}}|$ \\
-\midrule
- 16  & $3.7\times10^{-1}$ \\
- 32  & $2.0\times10^{-3}$ \\
- 64  & $9.5\times10^{-11}$ \\
-128  & $2.8\times10^{-13}$ \\
-\bottomrule
-\end{tabular}
-\end{block}
-
-\begin{alertblock}{Key advantage}
-\footnotesize $N=128$ reaches floating-point precision. Both Merton and Kou use the same COS engine --- only $\phi$ changes.
-\end{alertblock}
-
-\begin{block}{Digital options}
-\footnotesize Cash-or-nothing and asset-or-nothing: swap $U_k$ coefficients. Parity checks pass to machine precision.
-\end{block}
-\end{columns}
+\begin{frame}{COS Pricing Engine: Validation Results}
+\begin{center}
+\includegraphics[width=\linewidth,height=0.82\textheight,keepaspectratio]{W4_results.png}
+\end{center}
+\vspace{-4pt}
+{\footnotesize
+\textbf{Top-left}: Spectral convergence --- $N=128$ reaches $10^{-13}$ error.
+\textbf{Top-right}: COS vs Monte Carlo --- curves overlap exactly.
+\textbf{Bottom-left}: Kou IV smile is steeper and more negatively skewed than Merton.
+\textbf{Bottom-right}: Digital options (cash/asset-or-nothing) priced consistently.}
 \end{frame}
 
-\begin{frame}{Merton vs.\ Kou: Implied Volatility Smiles}
-\begin{columns}[T]
-\column{0.50\textwidth}
-\begin{block}{Merton smile}
-\footnotesize
-\begin{itemize}\itemsep2pt
-  \item Approximately \textbf{symmetric} about ATM
-  \item Log-normal jumps carry only mild negative skew
-  \item Underfits the steep put wing of equity indices
-\end{itemize}
-\end{block}
-
-\medskip
-\begin{block}{Kou smile}
-\footnotesize
-\begin{itemize}\itemsep2pt
-  \item Pronounced \textbf{negative skew}
-  \item Heavier mean down-jump ($1/\eta_2$) inflates OTM put IV
-  \item Better match to QQQ option surface
-\end{itemize}
-\end{block}
-
-\column{0.50\textwidth}
-\begin{block}{Parameter effects on the surface}
-\footnotesize
-\begin{tabular}{lp{3.2cm}}
-\toprule
-Parameter & Effect \\
-\midrule
-$\sigma$ & Level of IV \\
-$\lambda$ & Amount of tail risk priced \\
-$\mu_J < 0$ & Downside skew \\
-$\sigma_J$ & Tail thickness / kurtosis \\
-$p,\,\eta_1,\,\eta_2$ & Asymmetry (Kou only) \\
-\bottomrule
-\end{tabular}
-\end{block}
-
-\begin{alertblock}{Calibration strategy (W6)}
-\footnotesize Fit Merton/Kou to QQQ option cross-section; compare $\lambda^{\mathbb{Q}}$ vs $\lambda^{\mathbb{P}}$ for the jump risk premium.
-\end{alertblock}
-\end{columns}
-\end{frame}
-
-%====================================================================
 \section{Data Collection \& Jump Detection}
-%====================================================================
 
 \begin{frame}{QQQ Data: Sample Statistics}
 \begin{columns}[T]
-\column{0.50\textwidth}
-{\small\textbf{Sample:} 2023-05-23 to 2026-05-20, $N=732$ trading days.}
+\column{0.38\textwidth}
+{\small\textbf{Sample:} 2023-05-23 to 2026-05-20, $N=732$ days.}
 
 \smallskip
 \begin{block}{Return distribution}
@@ -576,27 +485,23 @@ $p,\,\eta_1,\,\eta_2$ & Asymmetry (Kou only) \\
 \toprule
 Statistic & Value \\
 \midrule
-Mean (daily)      & 0.000930 \\
-Std.\ dev         & 0.01242 \\
-Skewness          & 0.379 \\
-Excess kurtosis   & \textbf{10.59} \\
-JB $p$-value      & $<10^{-6}$ \\
-Min / Max return  & $-6.4\%$ / $+11.3\%$ \\
+Mean (daily)    & 0.000930 \\
+Std.\ dev       & 0.01242 \\
+Skewness        & 0.379 \\
+Excess kurtosis & \textbf{10.59} \\
+JB $p$-value    & $<10^{-6}$ \\
+Min / Max       & $-6.4\%$ / $+11.3\%$ \\
 \bottomrule
 \end{tabular}
 \end{block}
 
-\column{0.50\textwidth}
 \begin{alertblock}{Kurtosis $= 10.59 \gg 0$}
-\footnotesize Far heavier tails than the normal distribution. Directly motivates a jump component.
+\footnotesize Tails far heavier than normal $\Rightarrow$ jump component needed.
 \end{alertblock}
 
-\medskip
-\begin{block}{Option data (2026-05-20)}
-\footnotesize 901 contracts across 6 expiries after cleaning.\\
-Criteria: live bid/ask \emph{or} stale last price with open interest.\\
-Arbitrage flags: monotonicity + PCP checks.
-\end{block}
+\column{0.62\textwidth}
+\includegraphics[width=\linewidth,height=0.38\textheight,keepaspectratio]{qqq_price.png}\\[2pt]
+\includegraphics[width=\linewidth,height=0.38\textheight,keepaspectratio]{returns_histogram.png}
 \end{columns}
 \end{frame}
 
@@ -629,7 +534,6 @@ Z_t = \frac{\ell_t - \bar\ell}{\hat s_\ell}
 Metric & Value \\
 \midrule
 Single-condition days & 99 \\
-Ann.\ rate (single) & 34 / year \\
 Two-condition days & \textbf{4} \\
 Ann.\ rate (two-cond.) & \textbf{1.38 / year} \\
 Literature benchmark & 2--6 / year \\
@@ -637,11 +541,7 @@ Literature benchmark & 2--6 / year \\
 \end{tabular}
 \end{block}
 
-\begin{block}{Lognormal jump-size fit}
-\footnotesize $\hat\mu_J = -4.89$, $\hat\sigma_J = 1.16$\\
-KS test $p = 0.118$ --- not rejected at 5\%.\\
-Broadly consistent with Merton assumption.
-\end{block}
+\includegraphics[width=\linewidth,height=0.55\textheight,keepaspectratio]{detected_jumps.png}
 \end{columns}
 \end{frame}
 
@@ -668,9 +568,7 @@ Date & $r_t$ & $Z_t$ & 2-cond. & Event \\
 \normalsize\alert{Identified events} align with macro shocks, tariff announcements, and Fed surprises --- exactly the discontinuous news that Merton's model captures.
 \end{frame}
 
-
 \section{The Jump Risk Premium \& Roadmap to W6}
-
 
 \begin{frame}{Jump Risk Premium: The Central Economic Quantity}
 \begin{columns}[T]
@@ -738,9 +636,7 @@ If $\lambda^{\mathbb{Q}} > \lambda^{\mathbb{P}}$: investors require compensation
 \small\textbf{W1}: Lit.\ Review $\to$ \textbf{W2}: Math $\to$ \textbf{W3}: Monte Carlo $\to$ \textbf{W4}: COS $\to$ \textbf{W5}: Data \& jump detection $\to$ \textbf{W6}: Calibration \& risk premium
 \end{frame}
 
-
 \section{Conclusion}
-
 
 \begin{frame}{Summary}
 \begin{columns}[T]
@@ -775,7 +671,6 @@ If $\lambda^{\mathbb{Q}} > \lambda^{\mathbb{P}}$: investors require compensation
 \end{alertblock}
 \end{columns}
 \end{frame}
-
 
 {
 \setbeamertemplate{footline}{}
