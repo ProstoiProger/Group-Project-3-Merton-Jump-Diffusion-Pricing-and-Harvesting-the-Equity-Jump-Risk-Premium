@@ -1,0 +1,10 @@
+# Group 3 — Merton Jump-Diffusion: Pricing and Harvesting the Equity Jump Risk Premium
+# Unified requirements for W3 (Monte Carlo), W4 (COS engine), and W5 (data / EDA)
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+matplotlib>=3.8
+python-dotenv>=1.0
+yfinance>=0.2
+requests>=2.31

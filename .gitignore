@@ -1,7 +1,54 @@
+# ── Python ───────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────
+venv/
 .venv/
+env/
+.env.local
+
+# ── Secrets & local config ────────────────────────────────────────
+.env
+# .env.example is intentionally committed (it's a template)
+
+# ── Generated data & outputs ─────────────────────────────────────
+data/raw/
+data/cleaned/
+outputs/
+W3/results/
+W4/results/
+W5/data/
+W5/outputs/
+
+# ── Jupyter checkpoints ───────────────────────────────────────────
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# ── IDEs ──────────────────────────────────────────────────────────
 .idea/
 .vscode/
-*.csv
-venv
+*.suo
+*.user
+
+# ── OS artefacts ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── LaTeX auxiliary ───────────────────────────────────────────────
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
