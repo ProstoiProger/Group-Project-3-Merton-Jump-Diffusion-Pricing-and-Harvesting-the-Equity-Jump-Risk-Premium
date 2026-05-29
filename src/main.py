@@ -33,13 +33,14 @@ from .config import load_config
 from .mc_engine import write_outputs as mc_write_outputs
 from .cos_engine import write_outputs as cos_write_outputs
 from .data_pipeline import run as data_run
+from .calibration import write_outputs as w6_write_outputs
 
 LOGGER = logging.getLogger(__name__)
 
 
 def run_w3() -> None:
     """Monte Carlo pricing engine (W3)."""
-    merton, _kou, run, _data = load_config()
+    merton, _kou, run, _data, _calib = load_config()
     LOGGER.info("=" * 60)
     LOGGER.info("W3 — Monte Carlo Engine")
     LOGGER.info("params: %s", merton)
@@ -50,7 +51,7 @@ def run_w3() -> None:
 
 def run_w4() -> None:
     """COS / Fourier pricing engine (W4)."""
-    merton, kou, run, _data = load_config()
+    merton, kou, run, _data, _calib = load_config()
     LOGGER.info("=" * 60)
     LOGGER.info("W4 — COS Pricing Engine")
     LOGGER.info("params: %s", merton)
@@ -61,13 +62,23 @@ def run_w4() -> None:
 
 def run_w5() -> None:
     """Data collection and jump detection (W5)."""
-    _merton, _kou, _run, data = load_config()
+    _merton, _kou, _run, data, _calib = load_config()
     LOGGER.info("=" * 60)
     LOGGER.info("W5 — Data Collection & Jump Detection")
     LOGGER.info("ticker: %s  period: %s", data.ticker, data.data_period)
     LOGGER.info("=" * 60)
     data_run(data)
     LOGGER.info("W5 complete.")
+
+
+def run_w6() -> None:
+    """Merton & Kou calibration (W6)."""
+    merton, kou, run, data, calib = load_config()
+    LOGGER.info("=" * 60)
+    LOGGER.info("W6 — Calibration")
+    LOGGER.info("=" * 60)
+    w6_write_outputs(merton, kou, run, data, calib)
+    LOGGER.info("W6 complete.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -79,6 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--w3", action="store_true", help="Run W3: Monte Carlo engine.")
     parser.add_argument("--w4", action="store_true", help="Run W4: COS pricing engine.")
     parser.add_argument("--w5", action="store_true", help="Run W5: data collection + jump detection.")
+    parser.add_argument("--w6", action="store_true", help="Run W6: Merton & Kou calibration.")
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -97,7 +109,7 @@ def main() -> None:
         format="%(asctime)s | %(levelname)-8s | %(message)s",
     )
 
-    run_all = not (args.w3 or args.w4 or args.w5)
+    run_all = not (args.w3 or args.w4 or args.w5 or args.w6)
 
     if run_all or args.w3:
         run_w3()
@@ -105,6 +117,8 @@ def main() -> None:
         run_w4()
     if run_all or args.w5:
         run_w5()
+    if run_all or args.w6:
+        run_w6()
 
     LOGGER.info("=" * 60)
     LOGGER.info("Pipeline complete.")

@@ -131,9 +131,52 @@ class DataConfig:
     outputs_w5: Path = ROOT / "outputs" / "w5"
 
 
+
+
+@dataclass(frozen=True)
+class CalibrationConfig:
+    """W6 calibration: parameter bounds, optimizer settings, data filters."""
+
+    # Merton bounds (sigma, lambda, mu_J, sigma_J)
+    sigma_min: float = 0.05
+    sigma_max: float = 0.40
+    lam_min: float = 0.01
+    lam_max: float = 8.00
+    mu_j_min: float = -0.50
+    mu_j_max: float = 0.05
+    sigma_j_min: float = 0.01
+    sigma_j_max: float = 0.40
+
+    # Kou bounds (sigma, lambda are shared with Merton bounds)
+    p_up_min: float = 0.05
+    p_up_max: float = 0.95
+    eta1_min: float = 1.10
+    eta1_max: float = 50.0
+    eta2_min: float = 0.50
+    eta2_max: float = 50.0
+
+    # Optimizer settings
+    de_maxiter: int = 40
+    de_popsize: int = 12
+    lbfgs_maxiter: int = 100
+
+    # Data filter settings
+    t_min: float = 0.05
+    moneyness_min: float = 0.85
+    moneyness_max: float = 1.15
+    iv_min: float = 0.10
+    iv_max: float = 0.60
+
+    # Regularisation
+    reg_alpha: float = 0.01
+
+    # Output directory
+    outputs_w6: Path = ROOT / "outputs" / "w6"
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
-def load_config() -> tuple[MertonParams, KouParams, RunConfig, DataConfig]:
+def load_config() -> tuple[MertonParams, KouParams, RunConfig, DataConfig, CalibrationConfig]:
     """Load all configuration from .env + environment variables.
 
     Call once at application startup.  Downstream code should consume
@@ -181,4 +224,30 @@ def load_config() -> tuple[MertonParams, KouParams, RunConfig, DataConfig]:
         outputs_w5=Path(_s("OUTPUTS_W5", str(ROOT / "outputs" / "w5"))),
     )
 
-    return merton, kou, run, data
+    calib = CalibrationConfig(
+        sigma_min=_f("CALIB_SIGMA_MIN", 0.05),
+        sigma_max=_f("CALIB_SIGMA_MAX", 0.40),
+        lam_min=_f("CALIB_LAMBDA_MIN", 0.01),
+        lam_max=_f("CALIB_LAMBDA_MAX", 8.00),
+        mu_j_min=_f("CALIB_MUJ_MIN", -0.50),
+        mu_j_max=_f("CALIB_MUJ_MAX", 0.05),
+        sigma_j_min=_f("CALIB_SIGMAJ_MIN", 0.01),
+        sigma_j_max=_f("CALIB_SIGMAJ_MAX", 0.40),
+        p_up_min=_f("CALIB_P_UP_MIN", 0.05),
+        p_up_max=_f("CALIB_P_UP_MAX", 0.95),
+        eta1_min=_f("CALIB_ETA1_MIN", 1.10),
+        eta1_max=_f("CALIB_ETA1_MAX", 50.0),
+        eta2_min=_f("CALIB_ETA2_MIN", 0.50),
+        eta2_max=_f("CALIB_ETA2_MAX", 50.0),
+        de_maxiter=_i("CALIB_DE_MAXITER", 40),
+        de_popsize=_i("CALIB_DE_POPSIZE", 12),
+        lbfgs_maxiter=_i("CALIB_LBFGS_MAXITER", 100),
+        t_min=_f("CALIB_T_MIN", 0.05),
+        moneyness_min=_f("CALIB_MONEYNESS_MIN", 0.85),
+        moneyness_max=_f("CALIB_MONEYNESS_MAX", 1.15),
+        iv_min=_f("CALIB_IV_MIN", 0.10),
+        iv_max=_f("CALIB_IV_MAX", 0.60),
+        reg_alpha=_f("CALIB_REG_ALPHA", 0.01),
+    )
+
+    return merton, kou, run, data, calib
