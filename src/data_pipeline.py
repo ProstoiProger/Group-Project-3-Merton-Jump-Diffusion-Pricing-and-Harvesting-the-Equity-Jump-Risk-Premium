@@ -111,6 +111,8 @@ def plot_daily(df: pd.DataFrame, cfg: DataConfig) -> None:
 # ── stage 2: option chain data ────────────────────────────────────────────────
 
 def _get_chain(ticker_symbol: str, expiry: str) -> pd.DataFrame:
+    """Fetch one option chain. Robust to yfinance returning different
+    column sets for calls vs puts (a known upstream bug)."""
     ticker = yf.Ticker(ticker_symbol)
     chain = ticker.option_chain(expiry)
 
@@ -122,16 +124,25 @@ def _get_chain(ticker_symbol: str, expiry: str) -> pd.DataFrame:
     puts["type"] = "put"
     puts["expiry"] = expiry
 
+    # Align schemas: keep only columns that exist in BOTH
+    common_cols = [c for c in calls.columns if c in puts.columns]
+    calls = calls[common_cols]
+    puts = puts[common_cols]
+
     df = pd.concat([calls, puts], ignore_index=True)
     df["ticker"] = ticker_symbol
     return df
 
 
 def download_options(cfg: DataConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Download and clean QQQ option chains.
+    """Download and clean QQQ option chains across a broad term structure.
 
-    Returns (raw_df, clean_df) and saves both to cfg.data_raw / data_cleaned.
+    Selects expiries closest to target maturities [1W..1Y] rather than the
+    first N chronological (which are all weekly). Tolerates yfinance schema
+    mismatches by skipping broken chains.
     """
+    from datetime import datetime
+
     cfg.data_raw.mkdir(parents=True, exist_ok=True)
     cfg.data_cleaned.mkdir(parents=True, exist_ok=True)
 
@@ -140,32 +151,56 @@ def download_options(cfg: DataConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     if not expiries:
         raise RuntimeError(f"No option expiries for {cfg.ticker}")
 
+    target_days = [7, 14, 30, 60, 90, 180, 270, 365]
+    today = datetime.now().date()
+    selected = []
+    for tgt in target_days:
+        best = min(
+            expiries,
+            key=lambda e: abs((datetime.strptime(e, "%Y-%m-%d").date() - today).days - tgt),
+        )
+        if best not in selected:
+            selected.append(best)
+    LOGGER.info("Selected %d expiries spanning term structure: %s",
+                len(selected), selected)
+
     chains = []
-    for expiry in expiries[: cfg.n_expiries]:
-        LOGGER.info("Downloading option chain: %s", expiry)
+    for expiry in selected:
         try:
             chains.append(_get_chain(cfg.ticker, expiry))
+            LOGGER.info("  ok: %s", expiry)
         except Exception as exc:
-            LOGGER.warning("Skipping expiry %s: %s", expiry, exc)
+            LOGGER.warning("  SKIPPED %s: %s", expiry, exc)
 
     if not chains:
-        raise RuntimeError("No option chains downloaded")
+        raise RuntimeError("No option chains downloaded successfully")
 
     raw = pd.concat(chains, ignore_index=True)
-    clean = _clean_options(raw)
+    clean = _clean_options(raw, today)
 
     raw_path = cfg.data_raw / f"{cfg.ticker.lower()}_options_raw.csv"
     clean_path = cfg.data_cleaned / f"{cfg.ticker.lower()}_options_clean.csv"
     raw.to_csv(raw_path, index=False)
     clean.to_csv(clean_path, index=False)
-    LOGGER.info("Options — raw: %d rows, clean: %d rows", len(raw), len(clean))
+    LOGGER.info("Options - raw: %d rows, clean: %d rows", len(raw), len(clean))
     return raw, clean
 
 
-def _clean_options(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply data-quality filters to raw option data."""
+def _clean_options(df: pd.DataFrame, today=None) -> pd.DataFrame:
+    """Apply data-quality filters to raw option data.
+
+    Adds two columns useful for W6 calibration:
+        T            time to expiry in years (calendar days / 365)
+        price_source 'mid' if both bid&ask > 0, else 'lastPrice'
+    """
+    from datetime import datetime
+
+    if today is None:
+        today = datetime.now().date()
+
     df = df.copy()
-    numeric_cols = ["strike", "lastPrice", "bid", "ask", "volume", "openInterest", "impliedVolatility"]
+    numeric_cols = ["strike", "lastPrice", "bid", "ask", "volume",
+                    "openInterest", "impliedVolatility"]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -184,21 +219,27 @@ def _clean_options(df: pd.DataFrame) -> pd.DataFrame:
     valid_last = (df["lastPrice"].fillna(0) > 0) & (
         (df["openInterest"].fillna(0) > 0) | (df["volume"].fillna(0) > 0)
     )
-    df = df[valid_bidask | valid_last].copy()
 
+    # Attach price_source and option_price BEFORE row filtering so masks align.
     df["price_source"] = np.where(valid_bidask, "mid", "lastPrice")
     df["option_price"] = np.where(valid_bidask, df["mid_price"], df["lastPrice"])
+
+    df = df[valid_bidask | valid_last].copy()
 
     stale = (df["volume"].fillna(0) == 0) & (df["openInterest"].fillna(0) == 0) & (df["bid"].fillna(0) == 0)
     df = df[~stale].copy()
 
     valid_mid = df["mid_price"] > 0
     df["spread_pct"] = np.where(valid_mid, (df["ask"] - df["bid"]) / df["mid_price"], np.nan)
-    df = df[df["spread_pct"].isna() | (df["spread_pct"] < 0.50)]
+    df = df[df["spread_pct"].isna() | (df["spread_pct"] < 0.60)]
     df = df[df["option_price"] > 0.05]
 
     if "impliedVolatility" in df.columns:
         df = df[(df["impliedVolatility"] > 0) & (df["impliedVolatility"] < 3)]
+
+    df["T"] = df["expiry"].apply(
+        lambda e: max((datetime.strptime(e, "%Y-%m-%d").date() - today).days / 365.0, 1/365)
+    )
 
     df = df.drop_duplicates()
     df = df.sort_values(["expiry", "type", "strike"]).reset_index(drop=True)
