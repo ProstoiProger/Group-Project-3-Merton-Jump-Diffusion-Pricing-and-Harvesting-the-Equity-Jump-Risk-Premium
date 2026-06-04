@@ -1,0 +1,392 @@
+\section*{Calibration of Merton and Kou Jump-Diffusion Models to QQQ}
+
+\subsection*{Data and Methodology}
+
+We calibrate the Merton (1976) and Kou (2002) jump-diffusion models to a
+snapshot of QQQ option prices taken on 29~May~2026, with spot price
+$S_0 = \$735.60$ and a risk-free rate of $r = 5.00\%$. QQQ ETF options
+are American-style; we approximate them as European because the
+calibration uses only out-of-the-money quotes and excludes deep
+in-the-money contracts, where the early-exercise premium is largest.
+This approximation is documented as a limitation in the closing
+subsection. The raw option chain was retrieved through
+\texttt{yfinance} for eight maturities spread across the term structure
+(one week, two weeks, one month, two months, three months, seven
+months, ten months, thirteen months); 2{,}480 quotes survived the
+basic data-quality filters of \texttt{src/data\_pipeline.py} (positive
+bid-or-last price, non-stale, and IV plausibly below 300\%).
+
+For calibration we restrict to a clean near-ATM subset by applying four
+additional filters: time to expiry $T \geq 0.05$ years (drops the two
+shortest weekly maturities), out-of-the-money quotes only (puts with
+$K < S_0$ and calls with $K > S_0$), a moneyness band $K/S_0 \in
+[0.85, 1.15]$, and a Brent-recomputed implied volatility in $[0.10,
+0.60]$. After cleaning, $M = 424$ quotes across six maturities
+remained, ranging from $T = 0.077$~y (one month) to $T = 1.052$~y
+(thirteen months).
+
+For each candidate parameter vector $\theta$, model prices are computed
+via the COS method of Fang and Oosterlee (2008) with
+$N_{\text{COS}} = 512$ expansion terms and truncation parameter
+$L = 10$. Each model price is inverted back to its Black--Scholes
+implied volatility via Brent's method, and we minimise the vol-space
+root mean squared error
+\[
+   \text{RMSE}(\theta) \;=\;
+   \sqrt{\frac{1}{M}\sum_{i=1}^{M}
+            \bigl( \sigma^{\text{IV},\text{model}}_i(\theta)
+                   - \sigma^{\text{IV},\text{market}}_i \bigr)^{\!2}},
+\]
+where $M$ is the number of cleaned quotes (here $M = 424$) and
+$N_{\text{COS}}$ controls the COS Fourier-series accuracy.
+
+Optimisation runs in two stages. A \texttt{differential\_evolution}
+global search (population size~12, 40 generations, evaluated on a
+stratified sub-sample of 96 quotes for speed) locates the right region
+in parameter space; an \texttt{L-BFGS-B} local refinement then polishes
+the optimum on the full 424 quotes. All parameter bounds and optimiser
+settings are read from \texttt{.env} through the
+\texttt{CalibrationConfig} dataclass.
+
+We acknowledge two limitations on the data side. The snapshot was taken
+outside NYSE trading hours, so 98\% of cleaned quotes use last-trade
+price as a fallback for mid-price. We mitigate this by recomputing all
+implied volatilities ourselves via Brent rather than trusting
+vendor-reported IVs, which are unreliable for stale or zero-bid quotes.
+QQQ also pays a quarterly dividend (\textasciitilde$0.6\%$ annualised);
+we do not subtract a dividend yield $q$ from the discount rate. This
+biases the implied $\sigma$ marginally upward for longer-dated options;
+a production calibration should be performed on forward prices.
+
+
+\subsection*{Merton Calibration}
+
+The calibrated Merton parameters are summarised in the table below.
+The achieved vol-space RMSE is 0.01400, an average pricing error of
+1.40 percentage points in implied volatility across the 424-quote
+surface.
+
+\begin{table}[H]
+\centering
+\caption{Calibrated Merton parameters (QQQ, 2026-05-29).}
+\begin{tabular}{lrl}
+\toprule
+Parameter      & Value     & Interpretation \\
+\midrule
+$\sigma$       & $0.1858$  & continuous diffusion volatility \\
+$\lambda$      & $0.1633$  & risk-neutral jump intensity (jumps per year) \\
+$\mu_J$        & $-0.4954$ & mean log-jump size (at lower bound $-0.50$) \\
+$\sigma_J$     & $0.3339$  & log-jump size standard deviation \\
+$\kappa$       & $-0.3558$ & mean percentage jump $\mathbb{E}[e^J - 1]$ \\
+RMSE           & $0.01400$ & vol-space RMSE on 424 quotes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two features deserve immediate comment. First, the diffusion volatility
+$\sigma \approx 19\%$ is consistent with the realised volatility of QQQ
+over the past three years and with the at-the-money level of the IV
+surface. Indeed, this calibrated $\sigma$ is essentially identical to
+the annualised realised volatility of QQQ log-returns over the
+three-year W5 sample window ($\sqrt{252}\cdot 0.01242 \approx 19.7\%$),
+providing an independent cross-check that the calibration recovers the
+diffusion regime correctly. Second, the optimum lands on the lower bound of the project's
+specified $\mu_J$ range: even when the bound is widened to $-0.50$, the
+optimiser still attaches itself to it, implying a calibrated model in
+which crashes are very rare ($\lambda = 0.16$, i.e., roughly one event
+every six years) but catastrophic in magnitude ($\kappa \approx -36\%$
+on average). This boundary behaviour is the empirical signature of the
+identification problem analysed in the next subsection.
+
+\safefig{../outputs/w6/figures/smile_fit_shortest.png}{Market vs Merton
+and Kou implied volatilities for the one-month expiry. Black dots:
+market quotes; solid line: Merton fit; dashed line: Kou
+fit.}{fig:w6-smile-short}
+
+\safefig{../outputs/w6/figures/smile_fit_all_maturities.png}{Smile fit
+across all six calibrated maturities.}{fig:w6-smile-all}
+
+
+\subsection*{The Identification Problem}
+
+The project specification asks us to demonstrate that $\sigma$ and
+$\lambda$ are not jointly identified from option prices. Our calibration
+produces a stronger result: the more severe non-identification is
+between $\lambda$ and $\mu_J$, evidenced by the boundary behaviour above
+and confirmed by three independent diagnostics.
+
+\subsubsection*{Diagnostic 1: Boundary Attachment}
+
+The unregularised optimum lies at $\mu_J = -0.4954$, i.e., effectively
+on the lower bound $\mu_J = -0.50$. We did not impose this bound
+\emph{a priori} to constrain the problem; it was the widest economically
+plausible range. Nevertheless, the optimiser is unwilling to move away
+from it, indicating that the data prefers a corner solution.
+
+\subsubsection*{Diagnostic 2: Two-Dimensional Loss Surface}
+
+Fixing $(\sigma, \sigma_J)$ at their calibrated values and sweeping an
+$18 \times 18$ grid in $(\lambda, \mu_J)$ on the sub-sampled dataset
+reveals a curved low-loss valley running from the bottom-left to the
+upper-right of the plane. Within RMSE $+\,0.002$ of the grid minimum we
+find 7 distinct parameter pairs, all producing economically
+indistinguishable fits. The market data does not contain enough
+information to discriminate among them.
+
+\safefig{../outputs/w6/loss_surface_lambda_muJ.png}{Merton vol-space RMSE
+surface in $(\log_{10}\lambda, \mu_J)$ with $(\sigma, \sigma_J)$ fixed
+at calibrated values. White contours show iso-loss lines; the red star
+marks the calibrated optimum.}{fig:w6-loss-surface}
+
+\subsubsection*{Diagnostic 3: L1-Regularisation Path}
+
+Adding a penalty $\alpha\,|\mu_J|$ to the loss pulls the optimum away
+from the boundary, as expected for an ill-posed inverse problem. The
+regularisation path is computed on the stratified 96-quote sub-sample
+used for the global search to keep its five calibrations tractable in
+wall-clock time; the $\alpha = 0$ row is therefore numerically close
+to, but not exactly identical to, the full-surface main optimum in
+Table above. The qualitative trend (boundary attachment and recovery
+under penalty) is unaffected.
+
+\begin{table}[H]
+\centering
+\caption{Regularisation path. The L1 penalty $\alpha\,|\mu_J|$ added to
+the loss pushes the optimum out of the boundary; as $\alpha$ grows the
+optimum approaches the literature-consistent regime at a modest cost
+in fit.}
+\begin{tabular}{rrrrrr}
+\toprule
+$\alpha$ & $\sigma$ & $\lambda$ & $\mu_J$   & $\sigma_J$ & RMSE (unreg.) \\
+\midrule
+$0.000$  & $0.1863$ & $0.163$   & $-0.5000$ & $0.3051$   & $0.01398$ \\
+$0.005$  & $0.1794$ & $0.328$   & $-0.2718$ & $0.2493$   & $0.01448$ \\
+$0.010$  & $0.1741$ & $0.486$   & $-0.1967$ & $0.2161$   & $0.01502$ \\
+$0.020$  & $0.1659$ & $0.803$   & $-0.1329$ & $0.1791$   & $0.01593$ \\
+$0.050$  & $0.1369$ & $2.502$   & $-0.0606$ & $0.1164$   & $0.01851$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $\alpha = 0.05$ the solution lands at $\mu_J \approx -0.06$ and
+$\lambda \approx 2.5$, the literature-consistent regime of ``moderate
+jumps several times per year'' documented in Andersen, Benzoni and Lund
+(2002) and Eraker, Johannes and Polson (2003). The cost is a 32\%
+increase in RMSE ($0.01400 \to 0.01851$), which we view as a favourable
+trade-off: a modest deterioration in fit buys parameters that are both
+economically plausible and statistically stable.
+
+\safefig{../outputs/w6/regularisation_path.png}{Regularisation path. Each
+panel shows one Merton parameter as a function of the L1 penalty
+strength $\alpha$. Bottom-right: the unregularised RMSE deteriorates
+only modestly as $\alpha$ grows.}{fig:w6-reg-path}
+
+The economic content of this exercise is the \emph{peso problem} of
+Backus, Chernov and Martin (2011): the smile of an equity index can be
+generated either by frequent, mild jumps or by rare, catastrophic ones,
+and the data alone cannot tell the two regimes apart.
+
+
+\subsection*{Kou Comparison}
+
+We re-calibrated the same QQQ surface to the Kou (2002)
+double-exponential jump model, which replaces Merton's normal log-jump
+with the asymmetric density
+\[
+   f_J(j) \;=\; p\,\eta_1 e^{-\eta_1 j}\,\mathbf{1}_{j \geq 0}
+              + q\,\eta_2 e^{\eta_2 j}\,\mathbf{1}_{j < 0},
+   \qquad p + q = 1,\ \eta_1 > 1,\ \eta_2 > 0.
+\]
+The characteristic function from W2 substitutes directly into the COS
+kernel; calibration uses the same two-stage protocol.
+
+\begin{table}[H]
+\centering
+\caption{Calibrated Kou parameters (QQQ, 2026-05-29). The
+``$\approx 41\%$'' figure for $1/\eta_2$ refers to the mean
+\emph{log}-jump magnitude on the downside; the corresponding expected
+percentage price drop conditional on a downward jump is
+$1 - \eta_2/(\eta_2 + 1) \approx 29\%$.}
+\begin{tabular}{lrl}
+\toprule
+Parameter      & Value     & Interpretation \\
+\midrule
+$\sigma$       & $0.1813$  & diffusion volatility \\
+$\lambda$      & $1.825$   & jump intensity (jumps per year) \\
+$p$            & $0.875$   & probability of upward jump ($q = 0.125$) \\
+$\eta_1$       & $46.17$   & upward tail; mean upward log-jump $1/\eta_1 \approx 2.2\%$ \\
+$\eta_2$       & $2.44$    & downward tail; mean downward log-jump magnitude $1/\eta_2 \approx 41\%$ \\
+RMSE           & $0.01398$ & vol-space RMSE on 424 quotes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The economic structure is striking: 87.5\% of jumps are small upward
+moves (mean log-jump $\approx 2.2\%$), but the remaining 12.5\% are
+large downward moves whose mean log-magnitude is about $41\%$ --- which
+corresponds to an expected percentage drop, conditional on a down-jump,
+of $1 - \eta_2/(\eta_2 + 1) \approx 29\%$. The Kou compensator is
+\[
+   \kappa^Q \;=\; \frac{p\,\eta_1}{\eta_1 - 1}
+                 + \frac{q\,\eta_2}{\eta_2 + 1} - 1
+              \;=\; \frac{0.875 \cdot 46.17}{45.17}
+                  + \frac{0.125 \cdot 2.44}{3.44} - 1
+              \;\approx\; -1.7\%.
+\]
+The mean percentage jump is small in magnitude because the frequent
+small upward jumps and the rare large downward jumps approximately
+offset each other in mean. The variance contribution, by contrast, is
+dominated by the heavy left tail.
+
+\subsubsection*{Goodness-of-Fit Comparison}
+
+The table below places Merton and Kou side by side. Kou's vol-space
+RMSE is marginally lower (0.01398 vs 0.01400), but the Akaike
+information criterion marginally favours Merton ($\Delta\text{AIC} =
+1.06$, with AIC $= -3612.02$ vs $-3610.96$); since $\Delta\text{AIC} < 2$,
+the two models should be regarded as statistically very close rather
+than decisively separated by this criterion. The peso-style
+identification problem discussed below offers a more economically
+meaningful interpretation of the comparison.
+
+\begin{table}[H]
+\centering
+\caption{Model comparison. AIC penalises Kou for the extra parameter
+despite a marginally better in-sample fit.}
+\begin{tabular}{lrrr}
+\toprule
+Model  & $k$ params & RMSE     & AIC        \\
+\midrule
+Merton & $4$        & $0.01400$ & $-3612.02$ \\
+Kou    & $5$        & $0.01398$ & $-3610.96$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This result is not the textbook expectation that Kou should dominate
+Merton on equity surfaces; instead it reflects identification on the
+model-class level. Merton's $\mu_J \approx -0.50$,
+$\lambda \approx 0.16$ optimum (rare large jumps) and Kou's
+$1/\eta_2 \approx 0.41$, $\lambda \approx 1.83$ optimum (occasional
+very large downward jumps) are two different mathematical languages
+describing the same underlying realisations. The QQQ surface, taken on
+a single day, does not contain enough information to discriminate the
+two regimes.
+
+\safefig{../outputs/w6/figures/rmse_by_maturity.png}{Per-maturity RMSE:
+Merton (blue) vs Kou (orange).}{fig:w6-rmse-maturity}
+
+
+\subsection*{Jump Risk Premium}
+
+The final element of the calibration compares the risk-neutral jump
+parameters from the option calibration with the physical parameters
+from the W5 jump-detection pipeline. The W5 BNS-style diagnostic
+produces two jump-day classifications: a \emph{liberal} flag (Z-score
+above 2.0, 99 jump days) and a \emph{conservative} flag (Z-score above
+2.0 \emph{and} return above $3\times$ rolling-vol, only 4 jump days).
+We report the premium against both, since neither corresponds exactly
+to the events the risk-neutral $\lambda^Q$ is pricing.
+
+\subsubsection*{Intensity}
+
+The risk-neutral intensity is $\lambda^Q = 0.163$ jumps per year. The
+liberal physical intensity is $\lambda^{P,\text{lib}} = 34.08$ and the
+conservative one $\lambda^{P,\text{cons}} = 1.38$. A direct difference
+$\lambda^Q - \lambda^P$ is meaningless because the three quantities
+count different events: liberal-$P$ counts any volatility-test
+rejection (average $|r| \approx 1.3\%$), conservative-$P$ counts only
+the very largest moves (average $|r| \approx 6.3\%$), while
+$\lambda^Q$ measures the intensity of much rarer events
+($|\kappa^Q| \approx 36\%$) required to bend the IV smile.
+
+\subsubsection*{Jump-Variance Risk Premium}
+
+The cleaner, units-free metric is the ratio of total annualised jump
+variance under each measure:
+\[
+   \text{JVRP} \;=\;
+   \frac{\lambda^Q \cdot \mathbb{E}^Q[J^2]}
+        {\lambda^P \cdot \mathbb{E}^P[J^2]}.
+\]
+Plugging in $\mathbb{E}^Q[J^2] = \mu_J^2 + \sigma_J^2 = 0.357$, and the
+empirical second moments $\mathbb{E}^{P,\text{lib}}[J^2] =
+3.7 \times 10^{-4}$, $\mathbb{E}^{P,\text{cons}}[J^2] = 3.96 \times
+10^{-3}$:
+\[
+   \text{JVRP}_{\text{lib}}  \;=\;
+      \frac{0.163 \times 0.357}{34.08 \times 3.7 \times 10^{-4}}
+      \;=\; \frac{0.0583}{0.0127} \;=\; 4.57,
+\]
+\[
+   \text{JVRP}_{\text{cons}} \;=\;
+      \frac{0.163 \times 0.357}{1.38 \times 3.96 \times 10^{-3}}
+      \;=\; \frac{0.0583}{0.0055} \;=\; 10.69.
+\]
+
+Investors price jump variance at between 4.6 and 10.7 times its
+historical realisation, depending on how broadly ``a jump'' is defined.
+Both numbers are large positive premia and consistent in sign with the
+empirical estimates of Pan (2002), Eraker (2004), and Bollerslev and
+Todorov (2011) for the S\&P~500, although our magnitudes are at the
+upper end of the published range, a direct consequence of the
+peso-style calibration with very rare but very large risk-neutral
+jumps.
+
+This finding directly underwrites the W8 alpha strategy:
+short-volatility positions in QQQ index options harvest, on average,
+the jump variance premium documented here, while bearing the
+corresponding jump risk in the left tail of their P\&L distribution.
+
+
+\subsection*{Limitations and W7 Hand-Off}
+
+Our calibration has five limitations worth flagging for the volatility
+analysis in W7 and the hedging study in W8.
+
+\begin{enumerate}[leftmargin=*]
+   \item \textbf{American-style options approximated as European.}
+   QQQ ETF options are American. We use European COS pricing because
+   the calibration restricts to out-of-the-money quotes, where the
+   early-exercise premium is small. A production implementation
+   should add an American-style correction (Bjerksund--Stensland) or
+   work on forwards.
+
+   \item \textbf{No dividend yield.} The QQQ ETF pays a small
+   quarterly dividend (\textasciitilde$0.6\%$ annualised) that we do
+   not subtract from the discount rate. This biases the implied
+   $\sigma$ marginally upward for longer-dated options. The proper
+   fix is to calibrate on the forward $F = S_0 e^{(r-q)T}$ rather
+   than the spot.
+
+   \item \textbf{Boundary behaviour and identification.} The Merton
+   optimum lies on the lower bound for $\mu_J$ and would walk further
+   if allowed. All downstream Greeks, hedging ratios, and P\&L
+   distributions should be reported at \emph{both} the unregularised
+   parameters and at the regularised parameters of the previous
+   subsection, to avoid relying on a single corner solution.
+
+   \item \textbf{Short-maturity smile.} Both Merton and Kou fit the
+   shortest maturity systematically worse than longer-dated options.
+   W7's smile-decay analysis should document this and point to richer
+   models (Bates, CGMY) that address it.
+
+   \item \textbf{Single-day snapshot outside trading hours.} Only 2\%
+   of our quotes use a simultaneous live mid; the remainder fall back
+   to last-trade prices. A multi-date study during NYSE hours would
+   tighten all conclusions, particularly the Kou-vs-Merton comparison.
+\end{enumerate}
+
+The calibrated parameters are exposed to W7 through
+\texttt{src/iv\_surface.py}, which provides:
+\begin{itemize}[leftmargin=*]
+   \item \texttt{get\_merton\_params()} and \texttt{get\_kou\_params()},
+         returning the calibrated dictionaries;
+   \item \texttt{get\_merton\_params\_regularised(alpha)}, returning the
+         regularised alternatives at any $\alpha$ from the path above;
+   \item \texttt{merton\_iv(...)}, \texttt{kou\_iv(...)}, returning the
+         model implied volatility of a single option;
+   \item \texttt{merton\_iv\_surface(S0, r, K\_grid, T\_grid, params)},
+         returning a two-dimensional model IV grid suitable for direct
+         comparison with the market surface in W7.
+\end{itemize}
