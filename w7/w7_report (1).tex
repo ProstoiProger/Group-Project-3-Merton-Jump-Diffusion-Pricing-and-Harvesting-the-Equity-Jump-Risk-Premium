@@ -1,0 +1,374 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage[T1]{fontenc}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black
+}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\title{
+    \Large\textbf{Merton Jump-Diffusion: Jump Risk Premium}\\[6pt]
+    \large Week 7 --- Implied Volatility Surface and Model Limitations\\[4pt]
+    \normalsize Computational Finance --- Group 3
+}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+% ══════════════════════════════════════════════════════════════════════════════
+
+This report analyses the performance of the Merton (1976) jump-diffusion model
+against QQQ market option prices through the lens of the implied volatility
+surface. We use the calibrated parameters from Week 6 to construct model
+implied volatility (IV) surfaces, compare them with market surfaces, and
+diagnose the fundamental structural limitations of the model.
+
+The calibrated parameters used throughout (regularised, $\alpha=0.01$) are:
+\[
+    \sigma = 0.1741,\quad
+    \lambda = 0.4860,\quad
+    \mu_J = -0.1967,\quad
+    \sigma_J = 0.2161.
+\]
+These represent a moderate-jump regime pulled away from the boundary optimum
+$\mu_J = -0.50$ by L1 regularisation, producing more economically interpretable
+parameters while incurring only a small increase in RMSE ($1.40\% \to 1.50\%$).
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Implied Volatility Surfaces}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Construction}
+
+For each strike $K$ and maturity $T$ in the calibration dataset, the Merton
+model price is computed via the Poisson-weighted Black--Scholes sum:
+\begin{equation}
+    C^{\text{Merton}}(K,T) = \sum_{n=0}^{\infty}
+    \frac{e^{-\lambda' T}(\lambda' T)^n}{n!}\,
+    C^{\text{BS}}\!\left(S_0, K, T, r_n, \sigma_n\right),
+    \label{eq:merton_sum}
+\end{equation}
+where $\lambda' = \lambda(1+\kappa)$,
+$r_n = r - \lambda\kappa + n\mu_J/T + n\sigma_J^2/(2T)$,
+$\sigma_n = \sqrt{\sigma^2 + n\sigma_J^2/T}$, and
+$\kappa = e^{\mu_J + \sigma_J^2/2}-1$.
+
+The implied volatility is recovered by inverting the Black--Scholes formula
+numerically via Brent's method. OTM puts are used for $K < S_0$ and OTM calls
+for $K > S_0$ to minimise bid--ask spread effects.
+
+\subsection{Results}
+
+The three surfaces --- market, Merton model, and residual (market minus model)
+--- are computed on a grid of 45 strikes spanning the calibration range
+(\$626--\$845) and all six available maturities ($T = 0.077$ to $1.052$\,yr).
+
+The residual surface reveals two systematic failure regions:
+\begin{enumerate}
+    \item \textbf{Deep OTM puts} ($K/S_0 < 0.92$): market IV exceeds model IV
+    by up to 3--5 vol points, reflecting the market's demand for crash
+    protection that the lognormal jump distribution underweights.
+    \item \textbf{Short maturities} ($T < 0.15$\,yr): the model smile is too
+    flat relative to the steep market skew observed at 1--2 month horizons.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Smile Decay: Analytical Proof and Empirical Evidence}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Analytical Result}
+
+\begin{proposition}[Merton smile decay]
+Under the Merton jump-diffusion model, the implied volatility skew defined as
+$\mathrm{Skew}(T) = \sigma_{\mathrm{IV}}(0.90\,S_0, T) - \sigma_{\mathrm{IV}}(1.10\,S_0, T)$
+decays asymptotically as
+\[
+    \mathrm{Skew}(T) \;\sim\; \frac{A}{\sqrt{T}}, \qquad T \to \infty,
+\]
+for some constant $A > 0$ depending on $(\lambda, \mu_J, \sigma_J)$.
+\end{proposition}
+
+\begin{proof}
+The characteristic function of $\log S_T$ under Merton is
+\[
+    \varphi_T(u) = \exp\!\left[
+    T\!\left(iu\tilde{r} - \tfrac{1}{2}\sigma^2 u^2
+    + \lambda\left(e^{iu\mu_J - \frac{1}{2}\sigma_J^2 u^2}-1\right)\right)
+    \right],
+\]
+where $\tilde{r} = r - \lambda\kappa$.
+For large $T$, the central limit theorem for compound Poisson processes gives
+\[
+    \frac{\log S_T - \mu_T T}{\sqrt{V_T T}} \;\xrightarrow{d}\; \mathcal{N}(0,1),
+\]
+where $V_T = \sigma^2 + \lambda(\mu_J^2 + \sigma_J^2)$ is the total variance
+per unit time. The third cumulant of $\log S_T$ is
+$\kappa_3(T) = \lambda T \mu_J(\mu_J^2 + 3\sigma_J^2)$,
+growing linearly in $T$, while the standard deviation grows as $\sqrt{T}$.
+The skewness (normalised third cumulant) is therefore
+\[
+    \gamma_1(T) = \frac{\kappa_3(T)}{(\mathrm{Var}[\log S_T])^{3/2}}
+    = \frac{\lambda\mu_J(\mu_J^2+3\sigma_J^2)}{V_T^{3/2}}\cdot\frac{1}{\sqrt{T}}.
+\]
+Since the IV skew is proportional to the return skewness to leading order
+(Carr--Wu approximation), we obtain $\mathrm{Skew}(T) \sim A/\sqrt{T}$.
+\end{proof}
+
+\begin{remark}
+The market implied volatility skew decays empirically as $T^{-0.086}$
+(estimated from QQQ data), far slower than the theoretical $T^{-0.5}$ of
+the Merton model. This is the \emph{fundamental limitation}: the model cannot
+simultaneously fit both the level and the term structure of the skew.
+\end{remark}
+
+\subsection{Empirical Evidence}
+
+The fitted decay rates from QQQ data are:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+& \textbf{Slope} & \textbf{Interpretation} \\
+\midrule
+Merton model  & $-0.500$ & Theoretical $O(1/\sqrt{T})$ \\
+QQQ market    & $-0.086$ & Near-flat; persistent skew \\
+\bottomrule
+\end{tabular}
+\caption{Smile decay exponents: Merton vs QQQ market.}
+\end{table}
+
+The near-flat market skew term structure is consistent with the presence of
+stochastic volatility. Under the Heston model the skew decays as $O(T^{-1/2})$
+for short $T$ but flattens toward a constant for long $T$, producing an
+intermediate effective exponent compatible with the observed $-0.086$.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Short-Maturity Smile Analysis ($T \approx 1$M)}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Where the Merton Model Fits Well}
+
+At the shortest available maturity ($T = 0.077$\,yr, approximately 1 month,
+424 contracts across 109 strikes), the model performs acceptably in:
+
+\begin{itemize}
+    \item \textbf{Near-the-money} ($0.95 \leq K/S_0 \leq 1.05$): mean absolute
+    residual of $0.32\%$ in IV, consistent with bid--ask spread noise.
+    \item \textbf{Smile convexity}: the model correctly produces a positive
+    butterfly (smile shape) rather than a flat line.
+    \item \textbf{Overall ATM level}: matched to within $0.5\%$.
+\end{itemize}
+
+\subsection{Where the Merton Model Fails}
+
+\begin{enumerate}
+    \item \textbf{Deep OTM puts} ($K/S_0 < 0.92$): model undershoots market IV
+    by 3--6 vol points. The lognormal jump distribution assigns insufficient
+    probability mass to large negative moves.
+
+    \item \textbf{Far OTM calls} ($K/S_0 > 1.08$): slight overshoot, since
+    negative $\mu_J$ skews the jump distribution asymmetrically downward.
+
+    \item \textbf{Left-wing slope}: the market put skew is steeper than the
+    model can produce even at the boundary optimum $\mu_J = -0.50$. This is a
+    structural, not parametric, limitation.
+\end{enumerate}
+
+The fit improves monotonically with maturity. At $T > 0.5$\,yr the model
+captures the smile shape well; at $T < 0.2$\,yr the left-wing failure is most
+pronounced.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Calibration Performance by Maturity}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering
+\caption{Calibration RMSE by expiry date (Merton vs Kou).}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Expiry} & \textbf{T (yr)} & \textbf{N} &
+\textbf{Merton RMSE} & \textbf{Kou RMSE} & \textbf{Difference} \\
+\midrule
+2026-06-26 & 0.077 & 109 & 1.341\% & 1.363\% & $-$0.022\% \\
+2026-07-31 & 0.173 & 139 & 1.493\% & 1.473\% & $+$0.021\% \\
+2026-08-21 & 0.230 &  44 & 0.732\% & 0.720\% & $+$0.012\% \\
+2026-12-18 & 0.556 &  44 & 1.153\% & 1.155\% & $-$0.002\% \\
+2027-03-19 & 0.805 &  44 & 1.611\% & 1.616\% & $-$0.005\% \\
+2027-06-17 & 1.052 &  44 & 1.708\% & 1.709\% & $-$0.001\% \\
+\midrule
+\textbf{Overall} & & \textbf{424} & \textbf{1.400\%} & \textbf{1.398\%} & $-$0.002\% \\
+\bottomrule
+\end{tabular}
+\label{tab:rmse}
+\end{table}
+
+The Kou model's improvement over Merton is negligible ($0.002\%$ overall),
+suggesting that the distributional form of the jump size is not the primary
+source of model error. The dominant limitation is the absence of stochastic
+volatility dynamics.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Model Comparison and Richer Alternatives}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Summary Table}
+
+\begin{table}[H]
+\centering
+\caption{Comparison of option pricing models and how they address
+Merton's limitations.}
+\label{tab:models}
+\small
+\begin{tabular}{p{3.0cm} p{2.2cm} c p{2.8cm} p{3.2cm}}
+\toprule
+\textbf{Model} & \textbf{Jump type} & \textbf{Params} &
+\textbf{Smile decay} & \textbf{Key advantage} \\
+\midrule
+Black--Scholes      & None                 & 1   & Flat (none)             & Baseline only \\
+Merton (unreg.)     & Normal               & 4   & $O(T^{-0.5})$ too fast  & Simple, closed form \\
+Merton (reg.)       & Normal               & 4   & $O(T^{-0.5})$ too fast  & Stable parameters \\
+Kou                 & Asymm.\ exp.         & 5   & $O(T^{-0.5})$ too fast  & Heavier tails \\
+Heston              & Stoch.\ vol          & 5   & Slow $(\sim T^{-0.3})$  & Persistent skew \\
+Bates               & Normal + stoch.\ vol & 9   & Slow, matches market    & All main failures \\
+Inf.\ activity Levy & $\infty$ jumps       & 3--4 & Correct power law      & Excellent $T\!\to\!0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Addressing Each Failure}
+
+\paragraph{Failure 1: Smile decays too fast ($O(1/\sqrt{T})$).}
+The Heston (1993) stochastic volatility model introduces mean-reverting
+variance
+\[
+    dv_t = \kappa(\bar{v}-v_t)\,dt + \xi\sqrt{v_t}\,dW_t^v,
+\]
+which generates a persistent skew whose term structure is controlled by the
+mean-reversion speed $\kappa$. For small $\kappa$ (slow mean reversion) the
+model reproduces the near-flat market skew term structure.
+
+\paragraph{Failure 2: Deep OTM put wing underestimated.}
+The Kou (2002) model replaces the Gaussian jump distribution with an
+asymmetric double-exponential:
+\[
+    f_J(x) = p\,\eta_1 e^{-\eta_1 x}\mathbf{1}_{x>0}
+            + (1-p)\,\eta_2 e^{\eta_2 x}\mathbf{1}_{x<0}.
+\]
+The calibrated parameters ($\eta_2 = 2.44$, heavy downside tail) slightly
+improve the OTM put wing. However, the improvement is marginal because the
+fundamental issue is the absence of stochastic volatility, not the jump
+distribution.
+
+\paragraph{Failure 3: Short-maturity behaviour ($T \to 0$).}
+Infinite activity Levy processes (Variance Gamma, Normal Inverse Gaussian,
+CGMY) allow infinitely many small jumps per unit time. These generate a steep
+short-maturity smile decaying with the correct empirical power law, because
+the $T \to 0$ smile curvature is determined by the Blumenthal--Getoor index
+of the process rather than a central-limit-theorem argument.
+
+\paragraph{Industry solution: Bates model.}
+The Bates (1996) model combines Heston stochastic volatility with Merton
+normal jumps:
+\[
+    dS_t = (r - \lambda\kappa)\,S_t\,dt
+           + \sqrt{v_t}\,S_t\,dW_t^S
+           + (e^J - 1)\,S_t\,dN_t, \qquad
+    dv_t = \kappa(\bar{v}-v_t)\,dt + \xi\sqrt{v_t}\,dW_t^v.
+\]
+It addresses all three failures: stochastic volatility provides slow skew
+decay and term structure, while jumps sharpen the short-maturity smile and
+generate the asymmetric wing.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Empirical vs Risk-Neutral Jump Parameters}
+% ══════════════════════════════════════════════════════════════════════════════
+
+The calibrated risk-neutral intensity $\lambda^Q = 0.163$ jumps/year is
+substantially lower than the physical (BNS-estimated) intensity
+$\lambda^P \approx 34.1$ (single-condition) or $\lambda^P \approx 1.38$
+(two-condition strict filter). The \emph{jump risk premium} is:
+\[
+    \text{JRP} = \lambda^Q \cdot \mathbb{E}^Q[J^2]
+               - \lambda^P \cdot \mathbb{E}^P[J^2].
+\]
+
+\begin{table}[H]
+\centering
+\caption{Jump risk premium decomposition.}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Component} & \textbf{Single-condition} & \textbf{Two-condition} \\
+\midrule
+$\lambda^Q$                  & 0.163    & 0.163    \\
+$\mathbb{E}^Q[J^2]$          & 0.357    & 0.357    \\
+Jump variance (risk-neutral)  & 0.058    & 0.058    \\
+$\lambda^P$                  & 34.082   & 1.377    \\
+$\mathbb{E}^P[J^2]$          & 0.000374 & 0.003961 \\
+Jump variance (physical)      & 0.01274  & 0.005454 \\
+\textbf{JRP}                 & \textbf{4.575} & \textbf{10.688} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The large positive JRP indicates that investors pay a significant premium for
+jump insurance: the risk-neutral measure amplifies jump variance relative to
+the physical measure, consistent with expensive OTM put prices relative to
+historical jump frequencies.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+This analysis identifies three structural limitations of the Merton
+jump-diffusion model when applied to QQQ options:
+
+\begin{enumerate}
+    \item \textbf{Smile decays too fast}: the theoretical $O(1/\sqrt{T})$
+    decay is six times faster than the empirical market rate of $T^{-0.086}$.
+    This is an intrinsic consequence of the compound Poisson structure and
+    cannot be remedied by re-calibration.
+
+    \item \textbf{Deep OTM put wing underestimated}: the Gaussian jump
+    distribution assigns insufficient probability to extreme negative returns,
+    producing a smile that is too flat in the left wing.
+
+    \item \textbf{Short-maturity smile too shallow}: at $T < 0.15$\,yr the
+    model underpredicts the steep market skew, particularly where
+    infinite-activity Levy behaviour dominates.
+\end{enumerate}
+
+The Bates model (Heston + Merton jumps) addresses all three failures and
+represents the natural extension. For applications where short-maturity
+precision is critical, infinite activity Levy processes (VG, NIG, CGMY)
+provide better $T \to 0$ behaviour at lower parameter cost.
+
+Nonetheless, the Merton model achieves a calibration RMSE of $1.40\%$ across
+424 QQQ contracts --- comparable to the more complex Kou model ($1.40\%$) ---
+making it a competitive choice when interpretability and computational
+tractability are prioritised over marginal accuracy gains.
+
+\end{document}
