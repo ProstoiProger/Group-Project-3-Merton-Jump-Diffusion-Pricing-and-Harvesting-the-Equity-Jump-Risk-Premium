@@ -1,8 +1,0 @@
-Model,Jump type,Params,Cal. RMSE,Short-T smile,Smile decay,Key advantage
-Black-Scholes,None,1,~0.08+,❌ Flat,Flat (none),Baseline
-Merton (unreg.),Normal jumps,4,1.40%,⚠️ Underest. deep OTM,O(1/√T) too fast,—
-Merton (reg. α=0.01),Normal jumps,4,1.50%,⚠️ Moderate,O(1/√T) too fast,More stable params
-Kou,Asymmetric exp.,5,1.40%,✅ Better wings,O(1/√T) still too fast,Heavier tails
-Heston,Stoch. vol,5,~1.0-1.5%,⚠️ Misses T→0,Slow (~T^−0.3),Slow term structure
-Bates (Heston+jumps),Normal + stoch vol,9,~0.5-1%,✅ Good,Slow — matches market,Industry standard
-Inf. activity Lévy,∞ small jumps,3-4,~0.8-1.2%,✅ Excellent T→0,Correct O(T^-0.09),Best T→0 behaviour
