@@ -154,7 +154,11 @@ RMSE           & $0.01400$ & vol-space RMSE on 424 quotes \\
 Two features deserve immediate comment. First, the diffusion volatility
 $\sigma \approx 19\%$ is consistent with the realised volatility of QQQ
 over the past three years and with the at-the-money level of the IV
-surface. Second, the optimum lands on the lower bound of the project's
+surface. Indeed, this calibrated $\sigma$ is essentially identical to
+the annualised realised volatility of QQQ log-returns over the
+three-year W5 sample window ($\sqrt{252}\cdot 0.01242 \approx 19.7\%$),
+providing an independent cross-check that the calibration recovers the
+diffusion regime correctly. Second, the optimum lands on the lower bound of the project's
 specified $\mu_J$ range: even when the bound is widened to $-0.50$, the
 optimiser still attaches itself to it, implying a calibrated model in
 which crashes are very rare ($\lambda = 0.16$, i.e., roughly one event
@@ -306,8 +310,12 @@ dominated by the heavy left tail.
 
 The table below places Merton and Kou side by side. Kou's vol-space
 RMSE is marginally lower (0.01398 vs 0.01400), but the Akaike
-information criterion penalises Kou for its additional parameter and
-favours Merton (AIC $= -3612.02$ vs $-3610.96$).
+information criterion marginally favours Merton ($\Delta\text{AIC} =
+1.06$, with AIC $= -3612.02$ vs $-3610.96$); since $\Delta\text{AIC} < 2$,
+the two models should be regarded as statistically very close rather
+than decisively separated by this criterion. The peso-style
+identification problem discussed below offers a more economically
+meaningful interpretation of the comparison.
 
 \begin{table}[H]
 \centering
