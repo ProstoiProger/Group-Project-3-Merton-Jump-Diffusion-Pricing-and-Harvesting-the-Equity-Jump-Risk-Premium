@@ -22,7 +22,6 @@ env/
 # ── Generated data & outputs ─────────────────────────────────────
 data/raw/
 data/cleaned/
-outputs/
 W3/results/
 W4/results/
 W5/data/

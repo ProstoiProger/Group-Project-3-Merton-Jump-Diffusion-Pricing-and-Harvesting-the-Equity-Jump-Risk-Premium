@@ -1,0 +1,4 @@
+strategy,mean,std,kurtosis,VaR_5pct
+BS delta hedge,0.070026,31.749811,29.5657,-38.359507
+Merton delta hedge,0.157372,32.173269,26.9665,-42.515493
+MV hedge (Merton),0.560502,50.983969,18.3241,-78.299494

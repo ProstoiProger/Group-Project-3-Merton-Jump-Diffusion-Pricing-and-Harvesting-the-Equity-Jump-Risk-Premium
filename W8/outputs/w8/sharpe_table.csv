@@ -1,0 +1,2 @@
+strategy,n_trades,win_rate_pct,mean_pnl,std_pnl,sharpe_ann,var_5pct,kurtosis,avg_pnl_pct_prem,lambda_Q,lambda_P_BNS,JVRP
+Short straddle pre-earnings,151,97.35,24.976338,52.94931,0.9434,2.204483,63.7104,577.3924,0.486,1.377,10.688
