@@ -102,7 +102,7 @@ def bs_delta(S, K, T, r, sigma):
     return float(norm.cdf(d1))
 
 
-def merton_call(S, K, T, r, sigma, lam, mu_J, sigma_J, n_terms=150):
+def merton_call(S, K, T, r, sigma, lam, mu_J, sigma_J, n_terms=40):
     """Merton (1976) Poisson-weighted BS sum — eq. (2) of assignment spec."""
     if T <= 0.0:
         return max(S - K, 0.0)
@@ -131,7 +131,7 @@ def merton_delta(S, K, T, r, sigma, lam, mu_J, sigma_J, eps=0.005):
     return (up - down) / (2.0 * S * eps)
 
 
-def mv_delta(S, K, T, r, sigma, lam, mu_J, sigma_J, n_ghq=24):
+def mv_delta(S, K, T, r, sigma, lam, mu_J, sigma_J, n_ghq=8):
     """
     Minimum-variance hedge ratio (Merton 1976):
         Delta^MV = dC/dS + lambda * E[(e^J-1)*DeltaC_jump] / (sigma^2 * S)
@@ -196,7 +196,7 @@ def run_hedging_simulation(n_paths=4000, n_steps=63, T=0.25, K_ratio=1.0, seed=4
     rng = np.random.default_rng(seed)
 
     for trial in range(n_paths):
-        if trial % 1000 == 0:
+        if trial % 100 == 0:
             print(f"    path {trial:>5d}/{n_paths}")
         path = _sim_path(S0, T, r, sigma, lam, mu_J, sigma_J, n_steps, rng)
 
@@ -493,9 +493,11 @@ def _factor_reg(df):
     d['JumpFact'] = d['move_pct'].abs() - mean_mv
     X = d[['R_mkt','dVIX','JumpFact']].dropna()
     y = d.loc[X.index, 'net_pnl']
-    if len(X) < 6:
+    if len(X) < 6 or len(X) != len(y):
         return None
     X_mat = np.column_stack([np.ones(len(X)), X.values])
+    if len(X_mat) != len(y):
+        return None
     betas, *_ = np.linalg.lstsq(X_mat, y.values, rcond=None)
     return dict(zip(['alpha','beta_QQQ','beta_dVIX','beta_JumpFactor'], betas))
 
@@ -650,7 +652,7 @@ def main():
     parser.add_argument('--quick', action='store_true', help='Fast mode')
     args = parser.parse_args()
 
-    n_paths = 1000 if args.quick else 4000
+    n_paths = 100 if args.quick else 500
 
     print("\nW8 — Risk Lead: Hedging & Jump Risk P&L")
     print(f"Output: {OUT}")
